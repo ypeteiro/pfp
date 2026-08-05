@@ -1,2 +1,2 @@
 def main():
-    print('PFP')
+    print('PFP v0.2.0-alpha1')
