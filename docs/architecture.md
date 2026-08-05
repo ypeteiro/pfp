@@ -1,0 +1,1 @@
+Movimientos -> Posiciones -> Patrimonio -> Dashboard
