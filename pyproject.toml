@@ -1,5 +1,35 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
-name="pfp"
-version="0.1.0"
-requires-python=">=3.13"
-dependencies=["openpyxl>=3.1","pandas>=2.2"]
+name = "pfp"
+version = "0.1.0"
+description = "Personal Finance Portfolio"
+readme = "README.md"
+requires-python = ">=3.13"
+
+dependencies = [
+    "openpyxl>=3.1",
+    "pandas>=2.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
