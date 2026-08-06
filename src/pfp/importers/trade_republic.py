@@ -22,9 +22,6 @@ class TradeRepublicImporter(Importer):
 
         df = pd.read_csv(path)
 
-        print(df.shape)
-        print(df["type"].value_counts())
-
         movements = []
 
         for _, row in df.iterrows():
