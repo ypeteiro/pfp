@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from pfp.domain.account import Account
 from pfp.domain.portfolio import Portfolio
 from pfp.domain.position import Position
 
@@ -9,48 +10,66 @@ class PortfolioEngine:
     def build(self, movements):
 
         portfolio = Portfolio()
-
         portfolio.movements = movements
+
+        account_types = {
+            movement.account_type
+            for movement in movements
+            if movement.account_type
+        }
+
+        for account_type in sorted(account_types):
+            portfolio.accounts.append(
+                Account(
+                    name=account_type,
+                    broker="Trade Republic",
+                    currency="EUR",
+                )
+            )
 
         for movement in movements:
 
-            movement_type = movement.type.upper()
-
-            if movement_type == "TRANSFER_INSTANT_INBOUND":
-
+            if movement.type == "TRANSFER_INSTANT_INBOUND":
                 portfolio.cash += movement.amount
 
-                continue
+            elif movement.type == "BUY":
 
-            if movement_type != "BUY":
-                continue
+                if movement.symbol is None:
+                    continue
 
-            symbol = movement.symbol
+                if movement.shares is None:
+                    continue
 
-            if not symbol or str(symbol) == "nan":
-                continue
+                if movement.price is None:
+                    continue
 
-            if symbol not in portfolio.positions:
+                symbol = movement.symbol
 
-                portfolio.positions[symbol] = Position(
-                    symbol=symbol,
-                    name=movement.name,
+                if symbol not in portfolio.positions:
+                    portfolio.positions[symbol] = Position(
+                        symbol=symbol,
+                        name=movement.name or symbol,
+                        shares=Decimal("0"),
+                        invested=Decimal("0"),
+                    )
+
+                position = portfolio.positions[symbol]
+
+                position.shares += movement.shares
+                position.invested += abs(movement.amount)
+
+        portfolio.invested = sum(
+            position.invested
+            for position in portfolio.positions.values()
+        )
+
+        portfolio.cash -= portfolio.invested
+
+        for position in portfolio.positions.values():
+
+            if position.shares:
+                position.average_price = (
+                    position.invested / position.shares
                 )
-
-            position = portfolio.positions[symbol]
-
-            invested = -movement.amount
-
-            position.shares += movement.shares
-
-            position.invested += invested
-
-            portfolio.invested += invested
-
-            portfolio.cash -= invested
-
-            position.average_price = (
-                position.invested / position.shares
-            )
 
         return portfolio

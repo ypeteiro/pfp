@@ -35,3 +35,18 @@ def test_build_portfolio():
     assert "IE00BK5BQT80" in portfolio.positions
 
     assert "IE00BG47KH54" in portfolio.positions
+    
+def test_portfolio_creates_account_from_movements():
+    importer = TradeRepublicImporter()
+
+    movements = importer.load(CSV_FILE)
+
+    engine = PortfolioEngine()
+    portfolio = engine.build(movements)
+
+    assert len(portfolio.accounts) == 1
+
+    account = portfolio.accounts[0]
+
+    assert account.broker == "Trade Republic"
+    assert account.currency == "EUR"
