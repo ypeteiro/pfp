@@ -1,40 +1,22 @@
 import argparse
 from pathlib import Path
 
+from pfp.cli_output import print_portfolio
 from pfp.engine.portfolio_engine import PortfolioEngine
 from pfp.importers.trade_republic import TradeRepublicImporter
 
 
 def cmd_import_tr(csv_file: str) -> None:
-
     importer = TradeRepublicImporter()
-
     movements = importer.load(Path(csv_file))
 
     engine = PortfolioEngine()
-
     portfolio = engine.build(movements)
 
-    print()
-
-    print("========== CARTERA ==========")
-    print()
-
-    print(f"Efectivo : {portfolio.cash:.2f}")
-    print(f"Invertido: {portfolio.invested:.2f}")
-    print()
-
-    for position in portfolio.positions.values():
-
-        print(
-            f"{position.symbol:15}"
-            f"{position.shares:>15}"
-            f"{position.average_price:>15.2f}"
-        )
+    print_portfolio(portfolio)
 
 
-def main():
-
+def main() -> None:
     parser = argparse.ArgumentParser(prog="pfp")
 
     subparsers = parser.add_subparsers(dest="command")
