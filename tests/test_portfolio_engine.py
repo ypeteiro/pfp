@@ -53,7 +53,18 @@ def test_trade_republic_account_balance():
 
     account = portfolio.accounts[0]
 
-    assert account.name == "DEFAULT"
+    assert account.name == "Trade Republic"
     assert account.broker == "Trade Republic"
     assert account.currency == "EUR"
     assert round(float(account.balance), 2) == 3603.39
+    
+def test_trade_republic_account_name():
+    importer = TradeRepublicImporter()
+
+    movements = importer.load(CSV_FILE)
+
+    portfolio = PortfolioEngine().build(movements)
+
+    account = portfolio.accounts[0]
+
+    assert account.name == "Trade Republic"

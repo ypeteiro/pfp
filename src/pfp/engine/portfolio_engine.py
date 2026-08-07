@@ -21,7 +21,7 @@ class PortfolioEngine:
         for account_type in sorted(account_types):
             portfolio.accounts.append(
                 Account(
-                    name=account_type,
+                    name="Trade Republic",
                     broker="Trade Republic",
                     currency="EUR",
                 )
