@@ -65,6 +65,10 @@ class PortfolioEngine:
 
         portfolio.cash -= portfolio.invested
 
+        # El saldo de la cuenta es el efectivo neto.
+        for account in portfolio.accounts:
+            account.balance = portfolio.cash
+
         for position in portfolio.positions.values():
 
             if position.shares:
