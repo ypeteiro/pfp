@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from decimal import Decimal
 
+from pfp.domain.account import Account
 from pfp.domain.movement import Movement
 from pfp.domain.position import Position
 
@@ -9,6 +10,8 @@ from pfp.domain.position import Position
 class Portfolio:
 
     movements: list[Movement] = field(default_factory=list)
+
+    accounts: list[Account] = field(default_factory=list)
 
     positions: dict[str, Position] = field(default_factory=dict)
 
