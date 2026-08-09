@@ -7,7 +7,12 @@ from pfp.domain.position import Position
 
 class PortfolioEngine:
 
-    def build(self, movements, prices=None):
+    def build(
+        self,
+        movements,
+        prices=None,
+        investments=None,
+    ):
 
         portfolio = Portfolio()
         portfolio.movements = movements
@@ -74,6 +79,19 @@ class PortfolioEngine:
                     amount=movement.amount,
                 )
 
+        if investments is not None:
+
+            for investment in investments:
+
+                self._apply_buy(
+                    portfolio=portfolio,
+                    symbol=investment.symbol,
+                    name=investment.symbol,
+                    shares=investment.shares,
+                    amount=investment.amount,
+                    portfolio_class=investment.portfolio_class,
+                )
+
         portfolio.invested = sum(
             position.invested
             for position in portfolio.positions.values()
@@ -107,6 +125,7 @@ class PortfolioEngine:
         portfolio,
         investment,
     ):
+
         self._apply_buy(
             portfolio=portfolio,
             symbol=investment.symbol,

@@ -1,11 +1,21 @@
 import argparse
+from datetime import datetime, timezone
 from decimal import Decimal
 
 from pfp.cli_output import print_portfolio
+from pfp.engine.investment_engine import InvestmentEngine
 from pfp.engine.portfolio_engine import PortfolioEngine
 from pfp.engine.recommendation_engine import RecommendationEngine
+from pfp.importers.investment_repository import (
+    InvestmentRepository,
+)
 from pfp.importers.price_importer import PriceImporter
 from pfp.importers.trade_republic import TradeRepublicImporter
+
+
+DEFAULT_INVESTMENTS_FILE = (
+    "data/pfp/investments.csv"
+)
 
 
 def build_parser():
@@ -56,19 +66,56 @@ def build_parser():
         "movements_file",
     )
 
+    invest_parser = subparsers.add_parser(
+        "invest",
+        help="Register an executed investment",
+    )
+
+    invest_parser.add_argument(
+        "symbol",
+    )
+
+    invest_parser.add_argument(
+        "shares",
+        type=Decimal,
+    )
+
+    invest_parser.add_argument(
+        "amount",
+        type=Decimal,
+    )
+
+    invest_parser.add_argument(
+        "portfolio_class",
+    )
+
+    invest_parser.add_argument(
+        "movements_file",
+    )
+
     return parser
 
 
-def load_portfolio(movements_file):
+def load_portfolio(
+    movements_file,
+    investments_file=DEFAULT_INVESTMENTS_FILE,
+):
 
-    importer = TradeRepublicImporter()
+    movement_importer = TradeRepublicImporter()
 
-    movements = importer.load(
+    movements = movement_importer.load(
         movements_file
     )
 
+    investment_repository = InvestmentRepository(
+        investments_file
+    )
+
+    investments = investment_repository.load()
+
     return PortfolioEngine().build(
-        movements
+        movements,
+        investments=investments,
     )
 
 
@@ -99,9 +146,16 @@ def run_portfolio(
         prices_file
     )
 
+    investment_repository = InvestmentRepository(
+        DEFAULT_INVESTMENTS_FILE
+    )
+
+    investments = investment_repository.load()
+
     portfolio = PortfolioEngine().build(
         movements,
         prices,
+        investments,
     )
 
     print_portfolio(
@@ -160,20 +214,95 @@ def run_recommend(
     print()
 
 
-def _class_label(portfolio_class):
+def run_invest(
+    symbol,
+    shares,
+    amount,
+    portfolio_class,
+    movements_file,
+):
 
-    labels = {
-        "EQUITY": "Renta variable",
-        "FIXED_INCOME": "Renta fija",
-        "GOLD": "Oro",
-        "CRYPTO": "Crypto",
-        "UNKNOWN": "Sin clasificar",
-    }
-
-    return labels.get(
-        portfolio_class,
-        portfolio_class,
+    portfolio = load_portfolio(
+        movements_file
     )
+
+    investment_engine = InvestmentEngine()
+
+    investment = investment_engine.create(
+        symbol=symbol,
+        shares=shares,
+        amount=amount,
+        portfolio_class=portfolio_class,
+        datetime=datetime.now(
+            timezone.utc
+        ),
+    )
+
+    PortfolioEngine().apply_investment(
+        portfolio,
+        investment,
+    )
+
+    InvestmentRepository(
+        DEFAULT_INVESTMENTS_FILE
+    ).save(
+        investment
+    )
+
+    position = portfolio.positions[
+        investment.symbol
+    ]
+
+    print()
+    print(
+        "========== INVERSIÓN REGISTRADA =========="
+    )
+    print()
+
+    print(
+        f"Activo          : "
+        f"{investment.symbol}"
+    )
+
+    print(
+        f"Clase           : "
+        f"{investment.portfolio_class}"
+    )
+
+    print(
+        f"Participaciones : "
+        f"{investment.shares}"
+    )
+
+    print(
+        f"Importe         : "
+        f"{investment.amount:.2f} €"
+    )
+
+    print(
+        f"Precio          : "
+        f"{investment.price:.2f} €"
+    )
+
+    print()
+
+    print(
+        f"Posición total  : "
+        f"{position.shares}"
+        f" participaciones"
+    )
+
+    print(
+        f"Coste total     : "
+        f"{position.invested:.2f} €"
+    )
+
+    print(
+        f"Efectivo        : "
+        f"{portfolio.cash:.2f} €"
+    )
+
+    print()
 
 
 def main():
@@ -199,6 +328,16 @@ def main():
 
         run_recommend(
             args.amount,
+            args.movements_file,
+        )
+
+    elif args.command == "invest":
+
+        run_invest(
+            args.symbol,
+            args.shares,
+            args.amount,
+            args.portfolio_class,
             args.movements_file,
         )
 
