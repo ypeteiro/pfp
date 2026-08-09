@@ -12,20 +12,17 @@ class PortfolioEngine:
         portfolio = Portfolio()
         portfolio.movements = movements
 
-        account_types = {
-            movement.account_type
-            for movement in movements
-            if movement.account_type
-        }
+        accounts = {}
 
-        for account_type in sorted(account_types):
-            portfolio.accounts.append(
-                Account(
-                    name="Trade Republic",
-                    broker="Trade Republic",
-                    currency="EUR",
+        for movement in movements:
+            if movement.account_type not in accounts:
+                accounts[movement.account_type] = Account(
+                    name=movement.broker,
+                    broker=movement.broker,
+                    currency=movement.currency,
                 )
-            )
+
+        portfolio.accounts = list(accounts.values())
 
         for movement in movements:
 
@@ -65,12 +62,10 @@ class PortfolioEngine:
 
         portfolio.cash -= portfolio.invested
 
-        # El saldo de la cuenta es el efectivo neto.
         for account in portfolio.accounts:
             account.balance = portfolio.cash
 
         for position in portfolio.positions.values():
-
             if position.shares:
                 position.average_price = (
                     position.invested / position.shares

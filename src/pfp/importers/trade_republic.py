@@ -28,6 +28,7 @@ class TradeRepublicImporter(Importer):
                         "%Y-%m-%d",
                     ),
                     account_type=row["account_type"],
+                    broker="Trade Republic",
                     category=row["category"],
                     type=row["type"],
                     asset_class=row["asset_class"],

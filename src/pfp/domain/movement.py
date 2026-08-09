@@ -8,6 +8,7 @@ class Movement:
     datetime: datetime
     date: datetime
     account_type: str
+    broker: str
     category: str
     type: str
     asset_class: str | None

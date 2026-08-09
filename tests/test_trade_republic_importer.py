@@ -27,3 +27,10 @@ def test_import_first_trade_republic_movement():
     assert movement.currency == "EUR"
     assert movement.amount == 1000
     assert movement.account_type == "DEFAULT"
+    
+def test_import_movement_has_broker():
+    importer = TradeRepublicImporter()
+
+    movements = importer.load(CSV_FILE)
+
+    assert movements[0].broker == "Trade Republic"
