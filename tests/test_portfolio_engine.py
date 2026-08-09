@@ -68,3 +68,17 @@ def test_trade_republic_account_name():
     account = portfolio.accounts[0]
 
     assert account.name == "Trade Republic"
+    
+def test_portfolio_cash_matches_account_balance():
+    importer = TradeRepublicImporter()
+
+    movements = importer.load(CSV_FILE)
+
+    portfolio = PortfolioEngine().build(movements)
+
+    assert len(portfolio.accounts) == 1
+
+    account = portfolio.accounts[0]
+
+    assert portfolio.cash == account.balance
+    
