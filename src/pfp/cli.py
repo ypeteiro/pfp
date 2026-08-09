@@ -128,43 +128,33 @@ def run_recommend(
     )
 
     print()
-    print("========== RECOMENDACIÓN ==========")
+    print("========== ORDEN DE INVERSIÓN ==========")
     print()
 
     print(
-        f"Aportación total : "
+        f"Aportación : "
         f"{recommendation.total_amount:.2f} €"
     )
 
     print()
 
-    for allocation in recommendation.allocations:
-
-        if allocation.amount <= 0:
-            continue
+    for order in recommendation.orders:
 
         print(
-            f"{_class_label(allocation.portfolio_class):20}"
-            f": {allocation.amount:>8.2f} €"
+            f"{order.amount:>8.2f} €"
+            f" → {order.symbol}"
+            f" ({order.asset_name})"
         )
-
-        if allocation.symbol is not None:
-
-            print(
-                f"{'':20}"
-                f"→ {allocation.symbol}"
-                f" ({allocation.asset_name})"
-            )
 
     print()
 
     total = sum(
-        allocation.amount
-        for allocation in recommendation.allocations
+        order.amount
+        for order in recommendation.orders
     )
 
     print(
-        f"Total             : {total:.2f} €"
+        f"TOTAL      : {total:.2f} €"
     )
 
     print()

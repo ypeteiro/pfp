@@ -10,6 +10,14 @@ TARGET_ALLOCATION = {
 
 
 @dataclass(frozen=True, slots=True)
+class InvestmentOrder:
+    symbol: str
+    asset_name: str
+    portfolio_class: str
+    amount: Decimal
+
+
+@dataclass(frozen=True, slots=True)
 class AllocationRecommendation:
     portfolio_class: str
     amount: Decimal
@@ -24,6 +32,7 @@ class AllocationRecommendation:
 class Recommendation:
     total_amount: Decimal
     allocations: tuple[AllocationRecommendation, ...]
+    orders: tuple[InvestmentOrder, ...]
 
 
 class RecommendationEngine:
@@ -39,7 +48,9 @@ class RecommendationEngine:
         amount = Decimal(str(amount))
 
         if amount <= 0:
-            raise ValueError("Amount must be greater than zero")
+            raise ValueError(
+                "Amount must be greater than zero"
+            )
 
         totals = {
             portfolio_class: Decimal("0")
@@ -63,9 +74,10 @@ class RecommendationEngine:
                 continue
 
             totals[portfolio_class] += position.invested
-            positions_by_class[portfolio_class].append(
-                position
-            )
+
+            positions_by_class[
+                portfolio_class
+            ].append(position)
 
         total_invested = sum(totals.values())
 
@@ -153,6 +165,7 @@ class RecommendationEngine:
             allocations[largest_class] += remainder
 
         recommendations = []
+        orders = []
 
         for portfolio_class in self.target_allocation:
 
@@ -169,12 +182,26 @@ class RecommendationEngine:
                     key=lambda position: position.invested,
                 )
 
+            allocation_amount = allocations[
+                portfolio_class
+            ]
+
+            symbol = (
+                selected_position.symbol
+                if selected_position is not None
+                else None
+            )
+
+            asset_name = (
+                selected_position.name
+                if selected_position is not None
+                else None
+            )
+
             recommendations.append(
                 AllocationRecommendation(
                     portfolio_class=portfolio_class,
-                    amount=allocations[
-                        portfolio_class
-                    ],
+                    amount=allocation_amount,
                     current_percent=current_percentages[
                         portfolio_class
                     ],
@@ -189,20 +216,27 @@ class RecommendationEngine:
                             portfolio_class
                         ]
                     ),
-                    symbol=(
-                        selected_position.symbol
-                        if selected_position is not None
-                        else None
-                    ),
-                    asset_name=(
-                        selected_position.name
-                        if selected_position is not None
-                        else None
-                    ),
+                    symbol=symbol,
+                    asset_name=asset_name,
                 )
             )
+
+            if (
+                allocation_amount > 0
+                and selected_position is not None
+            ):
+
+                orders.append(
+                    InvestmentOrder(
+                        symbol=selected_position.symbol,
+                        asset_name=selected_position.name,
+                        portfolio_class=portfolio_class,
+                        amount=allocation_amount,
+                    )
+                )
 
         return Recommendation(
             total_amount=amount,
             allocations=tuple(recommendations),
+            orders=tuple(orders),
         )
