@@ -1,7 +1,6 @@
 from decimal import Decimal
 
 from pfp.domain.account import Account
-from pfp.domain.asset_catalog import AssetCatalog
 from pfp.domain.portfolio import Portfolio
 from pfp.domain.position import Position
 
@@ -44,28 +43,18 @@ class PortfolioEngine:
                 if movement.price is None:
                     continue
 
-                symbol = movement.symbol
-                asset = AssetCatalog.get_or_create(
-                    symbol,
-                    movement.name,
+                self._apply_buy(
+                    portfolio=portfolio,
+                    symbol=movement.symbol,
+                    name=movement.name or movement.symbol,
+                    shares=movement.shares,
+                    amount=abs(movement.amount),
+                    portfolio_class=getattr(
+                        movement,
+                        "portfolio_class",
+                        None,
+                    ),
                 )
-
-                if symbol not in portfolio.positions:
-
-                    portfolio.positions[symbol] = Position(
-                        symbol=symbol,
-                        name=asset.name,
-                        shares=Decimal("0"),
-                        invested=Decimal("0"),
-                        portfolio_class=asset.portfolio_class,
-                    )
-
-                position = portfolio.positions[symbol]
-
-                position.shares += movement.shares
-                position.invested += abs(movement.amount)
-
-                portfolio.cash += movement.amount
 
             elif movement.type == "SELL":
 
@@ -78,28 +67,12 @@ class PortfolioEngine:
                 if movement.amount is None:
                     continue
 
-                symbol = movement.symbol
-
-                if symbol not in portfolio.positions:
-                    continue
-
-                position = portfolio.positions[symbol]
-
-                if position.shares <= 0:
-                    continue
-
-                average_price = (
-                    position.invested / position.shares
+                self._apply_sell(
+                    portfolio=portfolio,
+                    symbol=movement.symbol,
+                    shares=movement.shares,
+                    amount=movement.amount,
                 )
-
-                invested_reduction = (
-                    average_price * movement.shares
-                )
-
-                position.shares -= movement.shares
-                position.invested -= invested_reduction
-
-                portfolio.cash += movement.amount
 
         portfolio.invested = sum(
             position.invested
@@ -111,18 +84,138 @@ class PortfolioEngine:
             if position.shares:
 
                 position.average_price = (
-                    position.invested / position.shares
+                    position.invested
+                    / position.shares
                 )
 
             if prices is not None:
 
-                market_price = prices.get(position.symbol)
+                market_price = prices.get(
+                    position.symbol
+                )
 
                 if market_price is not None:
                     position.market_price = market_price
 
         for account in portfolio.accounts:
-
             account.balance = portfolio.cash
 
         return portfolio
+
+    def apply_investment(
+        self,
+        portfolio,
+        investment,
+    ):
+        self._apply_buy(
+            portfolio=portfolio,
+            symbol=investment.symbol,
+            name=investment.symbol,
+            shares=investment.shares,
+            amount=investment.amount,
+            portfolio_class=investment.portfolio_class,
+        )
+
+        portfolio.invested = sum(
+            position.invested
+            for position in portfolio.positions.values()
+        )
+
+        return portfolio
+
+    def _apply_buy(
+        self,
+        portfolio,
+        symbol,
+        name,
+        shares,
+        amount,
+        portfolio_class=None,
+    ):
+
+        shares = Decimal(str(shares))
+        amount = Decimal(str(amount))
+
+        if shares <= 0:
+            raise ValueError(
+                "Shares must be greater than zero"
+            )
+
+        if amount <= 0:
+            raise ValueError(
+                "Amount must be greater than zero"
+            )
+
+        if portfolio.cash < amount:
+            raise ValueError(
+                "Insufficient cash"
+            )
+
+        if symbol not in portfolio.positions:
+
+            portfolio.positions[symbol] = Position(
+                symbol=symbol,
+                name=name,
+                shares=Decimal("0"),
+                invested=Decimal("0"),
+                portfolio_class=portfolio_class,
+            )
+
+        position = portfolio.positions[symbol]
+
+        position.shares += shares
+        position.invested += amount
+
+        if portfolio_class is not None:
+            position.portfolio_class = portfolio_class
+
+        portfolio.cash -= amount
+
+        if position.shares:
+            position.average_price = (
+                position.invested
+                / position.shares
+            )
+
+    def _apply_sell(
+        self,
+        portfolio,
+        symbol,
+        shares,
+        amount,
+    ):
+
+        shares = Decimal(str(shares))
+        amount = Decimal(str(amount))
+
+        if symbol not in portfolio.positions:
+            return
+
+        position = portfolio.positions[symbol]
+
+        if position.shares <= 0:
+            return
+
+        average_price = (
+            position.invested
+            / position.shares
+        )
+
+        invested_reduction = (
+            average_price * shares
+        )
+
+        position.shares -= shares
+        position.invested -= invested_reduction
+
+        portfolio.cash += amount
+
+        if position.shares:
+            position.average_price = (
+                position.invested
+                / position.shares
+            )
+        else:
+            position.shares = Decimal("0")
+            position.invested = Decimal("0")
+            position.average_price = Decimal("0")
