@@ -1,6 +1,9 @@
 from dataclasses import dataclass
-@dataclass(slots=True)
+
+
+@dataclass(frozen=True, slots=True)
 class Asset:
-    isin:str
-    ticker:str
-    name:str
+
+    symbol: str
+    name: str
+    portfolio_class: str
