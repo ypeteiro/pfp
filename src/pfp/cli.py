@@ -101,6 +101,29 @@ def build_parser():
         default=DEFAULT_INVESTMENTS_FILE,
     )
 
+    invest_order_parser = subparsers.add_parser(
+        "invest-order",
+        help="Execute an investment order at the current market price",
+    )
+
+    invest_order_parser.add_argument(
+        "symbol",
+    )
+
+    invest_order_parser.add_argument(
+        "amount",
+        type=Decimal,
+    )
+
+    invest_order_parser.add_argument(
+        "movements_file",
+    )
+
+    invest_order_parser.add_argument(
+        "--investments-file",
+        default=DEFAULT_INVESTMENTS_FILE,
+    )
+
     return parser
 
 
@@ -323,6 +346,63 @@ def run_invest(
     print()
 
 
+def run_invest_order(
+    symbol,
+    amount,
+    movements_file,
+    investments_file,
+    price_provider=None,
+):
+
+    amount = Decimal(str(amount))
+
+    if amount <= 0:
+        raise ValueError(
+            "Amount must be greater than zero"
+        )
+
+    portfolio = load_portfolio(
+        movements_file,
+        investments_file,
+    )
+
+    position = portfolio.positions.get(
+        symbol
+    )
+
+    if position is None:
+        raise ValueError(
+            "Symbol is not present in portfolio"
+        )
+
+    price_provider = (
+        price_provider
+        or CompositePriceProvider()
+    )
+
+    prices = price_provider.get_prices(
+        [symbol]
+    )
+
+    price = prices.get(symbol)
+
+    if price is None:
+        raise ValueError(
+            "Price is not available for symbol"
+        )
+
+    shares = amount / price
+
+    run_invest(
+        symbol=symbol,
+        shares=shares,
+        amount=amount,
+        portfolio_class=position.portfolio_class,
+        movements_file=movements_file,
+        investments_file=investments_file,
+    )
+
+
 def main():
 
     parser = build_parser()
@@ -355,6 +435,15 @@ def main():
             shares=args.shares,
             amount=args.amount,
             portfolio_class=args.portfolio_class,
+            movements_file=args.movements_file,
+            investments_file=args.investments_file,
+        )
+
+    elif args.command == "invest-order":
+
+        run_invest_order(
+            symbol=args.symbol,
+            amount=args.amount,
             movements_file=args.movements_file,
             investments_file=args.investments_file,
         )
