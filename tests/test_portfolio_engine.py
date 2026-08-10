@@ -64,7 +64,8 @@ def test_trade_republic_account_balance():
     assert account.broker == "Trade Republic"
     assert account.currency == "EUR"
     assert round(float(account.balance), 2) == 3603.39
-    
+
+
 def test_trade_republic_account_name():
     importer = TradeRepublicImporter()
 
@@ -75,7 +76,8 @@ def test_trade_republic_account_name():
     account = portfolio.accounts[0]
 
     assert account.name == "Trade Republic"
-    
+
+
 def test_portfolio_cash_matches_account_balance():
     importer = TradeRepublicImporter()
 
@@ -88,6 +90,7 @@ def test_portfolio_cash_matches_account_balance():
     account = portfolio.accounts[0]
 
     assert portfolio.cash == account.balance
+
 
 def test_sell_reduces_position_and_increases_cash():
     importer = TradeRepublicImporter()
@@ -129,6 +132,7 @@ def test_sell_reduces_position_and_increases_cash():
 
     assert position.shares == Decimal("0.692682")
     assert portfolio.cash == Decimal("3753.39")
+
 
 def test_sell_reduces_invested_at_average_cost():
     importer = TradeRepublicImporter()
@@ -179,7 +183,8 @@ def test_sell_reduces_invested_at_average_cost():
     assert position.average_price.quantize(Decimal("0.0000000001")) == (
         expected_average_price.quantize(Decimal("0.0000000001"))
     )
-    
+
+
 def test_apply_investment_reduces_cash_and_increases_position():
     portfolio = Portfolio()
 
@@ -270,4 +275,59 @@ def test_apply_investment_rejects_insufficient_cash():
     else:
         raise AssertionError(
             "Expected ValueError"
-        )    
+        )
+
+
+def test_build_applies_persisted_investment_once():
+    investment = Investment(
+        datetime=datetime(2026, 8, 10, tzinfo=timezone.utc),
+        symbol="TEST",
+        shares=Decimal("4"),
+        amount=Decimal("400"),
+        price=Decimal("100"),
+        portfolio_class="EQUITY",
+    )
+
+    portfolio = PortfolioEngine().build(
+        movements=[],
+        investments=[investment],
+    )
+
+    position = portfolio.positions["TEST"]
+
+    assert portfolio.cash == Decimal("-400")
+    assert position.shares == Decimal("4")
+    assert position.invested == Decimal("400")
+    assert position.portfolio_class == "EQUITY"
+
+
+def test_build_applies_multiple_persisted_investments_once_each():
+    first = Investment(
+        datetime=datetime(2026, 8, 10, tzinfo=timezone.utc),
+        symbol="TEST",
+        shares=Decimal("2"),
+        amount=Decimal("200"),
+        price=Decimal("100"),
+        portfolio_class="EQUITY",
+    )
+
+    second = Investment(
+        datetime=datetime(2026, 8, 11, tzinfo=timezone.utc),
+        symbol="TEST",
+        shares=Decimal("3"),
+        amount=Decimal("360"),
+        price=Decimal("120"),
+        portfolio_class="EQUITY",
+    )
+
+    portfolio = PortfolioEngine().build(
+        movements=[],
+        investments=[first, second],
+    )
+
+    position = portfolio.positions["TEST"]
+
+    assert portfolio.cash == Decimal("-560")
+    assert position.shares == Decimal("5")
+    assert position.invested == Decimal("560")
+    assert position.average_price == Decimal("112")
