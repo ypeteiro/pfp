@@ -20,15 +20,32 @@ TARGET_ALLOCATION = {
 }
 
 
-def _class_label(portfolio_class: str) -> str:
+def _normalized_class(
+    portfolio_class: str | None,
+) -> str:
+    if portfolio_class is None:
+        return "UNKNOWN"
+
+    return portfolio_class
+
+
+def _class_label(
+    portfolio_class: str | None,
+) -> str:
+
+    normalized_class = _normalized_class(
+        portfolio_class
+    )
 
     return PORTFOLIO_CLASS_LABELS.get(
-        portfolio_class,
-        portfolio_class,
+        normalized_class,
+        normalized_class,
     )
 
 
-def print_portfolio(portfolio: Portfolio) -> None:
+def print_portfolio(
+    portfolio: Portfolio,
+) -> None:
 
     market_invested = Decimal("0")
     missing_prices = []
@@ -37,29 +54,52 @@ def print_portfolio(portfolio: Portfolio) -> None:
 
         if position.market_value is None:
 
-            missing_prices.append(position.symbol)
+            missing_prices.append(
+                position.symbol
+            )
 
         else:
 
-            market_invested += position.market_value
+            market_invested += (
+                position.market_value
+            )
 
-    market_total = portfolio.cash + market_invested
+    market_total = (
+        portfolio.cash
+        + market_invested
+    )
 
     print()
     print("========== PFP ==========")
     print()
 
-    print(f"Efectivo             : {portfolio.cash:.2f} €")
-    print(f"Coste invertido      : {portfolio.invested:.2f} €")
+    print(
+        f"Efectivo             : "
+        f"{portfolio.cash:.2f} €"
+    )
+
+    print(
+        f"Coste invertido      : "
+        f"{portfolio.invested:.2f} €"
+    )
 
     if missing_prices:
 
-        print("Valor mercado        : N/D")
+        print(
+            "Valor mercado        : N/D"
+        )
 
     else:
 
-        print(f"Valor mercado        : {market_invested:.2f} €")
-        print(f"Patrimonio mercado   : {market_total:.2f} €")
+        print(
+            f"Valor mercado        : "
+            f"{market_invested:.2f} €"
+        )
+
+        print(
+            f"Patrimonio mercado   : "
+            f"{market_total:.2f} €"
+        )
 
     print()
 
@@ -75,8 +115,13 @@ def print_portfolio(portfolio: Portfolio) -> None:
 
         else:
 
-            market_value = f"{position.market_value:.2f} €"
-            gain_loss = f"{position.gain_loss:.2f} €"
+            market_value = (
+                f"{position.market_value:.2f} €"
+            )
+
+            gain_loss = (
+                f"{position.gain_loss:.2f} €"
+            )
 
         print(
             f"{position.symbol:15}"
@@ -94,9 +139,10 @@ def print_portfolio(portfolio: Portfolio) -> None:
         print("-" * 80)
 
         for symbol in missing_prices:
-            print(f"{symbol}")
+            print(symbol)
 
         print()
+
         print(
             "Añade los precios actuales en "
             "src/pfp/domain/market_prices.py."
@@ -110,8 +156,12 @@ def print_portfolio(portfolio: Portfolio) -> None:
 
     for position in portfolio.positions.values():
 
+        portfolio_class = _normalized_class(
+            position.portfolio_class
+        )
+
         invested_by_class[
-            getattr(position, "portfolio_class", "UNKNOWN")
+            portfolio_class
         ] += position.market_value
 
     print("ASIGNACIÓN DE MERCADO")
@@ -143,7 +193,9 @@ def print_portfolio(portfolio: Portfolio) -> None:
     print("OBJETIVO")
     print("-" * 80)
 
-    for portfolio_class, target in TARGET_ALLOCATION.items():
+    for portfolio_class, target in (
+        TARGET_ALLOCATION.items()
+    ):
 
         current_amount = invested_by_class.get(
             portfolio_class,
@@ -162,7 +214,10 @@ def print_portfolio(portfolio: Portfolio) -> None:
 
             current_percentage = Decimal("0")
 
-        difference = current_percentage - target
+        difference = (
+            current_percentage
+            - target
+        )
 
         print(
             f"{_class_label(portfolio_class):20}"

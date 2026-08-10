@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from pfp.domain.account import Account
+from pfp.domain.asset_catalog import AssetCatalog
 from pfp.domain.portfolio import Portfolio
 from pfp.domain.position import Position
 
@@ -48,17 +49,18 @@ class PortfolioEngine:
                 if movement.price is None:
                     continue
 
+                asset = AssetCatalog.get_or_create(
+                    movement.symbol,
+                    movement.name,
+                )
+
                 self._apply_buy(
                     portfolio=portfolio,
                     symbol=movement.symbol,
-                    name=movement.name or movement.symbol,
+                    name=asset.name,
                     shares=movement.shares,
                     amount=abs(movement.amount),
-                    portfolio_class=getattr(
-                        movement,
-                        "portfolio_class",
-                        None,
-                    ),
+                    portfolio_class=asset.portfolio_class,
                 )
 
             elif movement.type == "SELL":
@@ -191,6 +193,7 @@ class PortfolioEngine:
         portfolio.cash -= amount
 
         if position.shares:
+
             position.average_price = (
                 position.invested
                 / position.shares
@@ -230,11 +233,14 @@ class PortfolioEngine:
         portfolio.cash += amount
 
         if position.shares:
+
             position.average_price = (
                 position.invested
                 / position.shares
             )
+
         else:
+
             position.shares = Decimal("0")
             position.invested = Decimal("0")
             position.average_price = Decimal("0")
