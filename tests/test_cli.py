@@ -1,12 +1,11 @@
 from pathlib import Path
 from decimal import Decimal
 
-from pfp.cli import run_invest, run_invest_order
+from pfp.cli import load_portfolio, run_invest, run_invest_order, run_recommend
 from pfp.engine.recommendation_engine import RecommendationEngine
 from pfp.importers.investment_repository import (
     InvestmentRepository,
 )
-from pfp.cli import load_portfolio
 
 
 MOVEMENTS_FILE = Path(
@@ -189,3 +188,37 @@ def test_recommendation_order_can_be_executed_as_investment(
     assert investments[0].symbol == order.symbol
     assert investments[0].amount == order.amount
     assert investments[0].portfolio_class == order.portfolio_class
+
+
+def test_run_recommend_prints_executable_invest_order(
+    tmp_path,
+    capsys,
+):
+    investments_file = (
+        tmp_path / "investments.csv"
+    )
+
+    portfolio = load_portfolio(
+        MOVEMENTS_FILE,
+        investments_file,
+    )
+
+    recommendation = RecommendationEngine().recommend(
+        portfolio,
+        Decimal("300"),
+    )
+
+    run_recommend(
+        Decimal("300"),
+        MOVEMENTS_FILE,
+    )
+
+    output = capsys.readouterr().out
+
+    for order in recommendation.orders:
+        assert (
+            "python -m pfp invest-order "
+            f"{order.symbol} "
+            f"{order.amount:.2f} "
+            f"{MOVEMENTS_FILE}"
+        ) in output
