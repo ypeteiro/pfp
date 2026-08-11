@@ -1,9 +1,10 @@
 from pathlib import Path
 from decimal import Decimal
 
-from pfp.cli import load_portfolio, run_invest, run_invest_order, run_recommend
+from pfp.cli import load_portfolio, run_invest, run_invest_order, run_recommend, run_sell
 from pfp.engine.recommendation_engine import RecommendationEngine
 from pfp.importers.investment_repository import InvestmentRepository
+from pfp.importers.sale_repository import SaleRepository
 
 
 MOVEMENTS_FILE = Path(
@@ -158,3 +159,54 @@ def test_run_recommend_prints_executable_invest_order(tmp_path, capsys):
             f"{MOVEMENTS_FILE} "
             f"--investments-file {investments_file}"
         ) in output
+
+
+def test_run_sell_persists_sale_and_updates_portfolio(tmp_path):
+    sales_file = tmp_path / "sales.csv"
+    investments_file = tmp_path / "investments.csv"
+
+    before = load_portfolio(MOVEMENTS_FILE, investments_file, sales_file)
+    before_position = before.positions["IE00B4L5Y983"]
+
+    run_sell(
+        symbol="IE00B4L5Y983",
+        shares=Decimal("0.1"),
+        amount=Decimal("150"),
+        movements_file=MOVEMENTS_FILE,
+        investments_file=investments_file,
+        sales_file=sales_file,
+    )
+
+    sales = SaleRepository(sales_file).load()
+    assert len(sales) == 1
+    assert sales[0].symbol == "IE00B4L5Y983"
+    assert sales[0].shares == Decimal("0.1")
+    assert sales[0].amount == Decimal("150")
+    assert sales[0].price == Decimal("1500")
+    assert sales[0].datetime.tzinfo is not None
+
+    after = load_portfolio(MOVEMENTS_FILE, investments_file, sales_file)
+    after_position = after.positions["IE00B4L5Y983"]
+    assert after_position.shares == before_position.shares - Decimal("0.1")
+    assert after.cash == before.cash + Decimal("150")
+
+
+def test_run_sell_rejects_more_shares_than_position(tmp_path):
+    sales_file = tmp_path / "sales.csv"
+    investments_file = tmp_path / "investments.csv"
+    portfolio = load_portfolio(MOVEMENTS_FILE, investments_file, sales_file)
+    position = portfolio.positions["IE00B4L5Y983"]
+
+    try:
+        run_sell(
+            symbol="IE00B4L5Y983",
+            shares=position.shares + Decimal("0.1"),
+            amount=Decimal("150"),
+            movements_file=MOVEMENTS_FILE,
+            investments_file=investments_file,
+            sales_file=sales_file,
+        )
+    except ValueError as error:
+        assert str(error) == "Insufficient shares"
+    else:
+        raise AssertionError("Expected ValueError")
