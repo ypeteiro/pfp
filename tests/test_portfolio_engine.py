@@ -6,10 +6,10 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 
 from pfp.domain.movement import Movement
-
 from pfp.domain.investment import Investment
 from pfp.domain.portfolio import Portfolio
 from pfp.domain.position import Position
+from pfp.domain.sale import Sale
 
 CSV_FILE = Path("data/imports/trade_republic.csv")
 
@@ -133,22 +133,12 @@ def test_sell_records_realized_gain_loss():
 def test_sell_records_realized_loss():
     importer = TradeRepublicImporter()
     movements = importer.load(CSV_FILE)
-
     before = PortfolioEngine().build(movements)
-
-    movements.append(
-        _sell_movement(
-            amount="10",
-            transaction_id="test-sell-loss",
-        )
-    )
-
+    movements.append(_sell_movement(amount="10", transaction_id="test-sell-loss"))
     after = PortfolioEngine().build(movements)
-
     realized_change = after.realized_gain_loss - before.realized_gain_loss
     average_price = Decimal("100") / Decimal("0.792682")
     expected_realized = Decimal("10") - (average_price * Decimal("0.1"))
-
     assert realized_change < Decimal("0")
     assert realized_change.quantize(Decimal("0.0000000001")) == expected_realized.quantize(Decimal("0.0000000001"))
 
@@ -163,6 +153,24 @@ def test_sell_rejects_more_shares_than_position():
         assert str(exc) == "Insufficient shares"
     else:
         raise AssertionError("Expected ValueError")
+
+
+def test_build_applies_persisted_sale_once():
+    base = PortfolioEngine().build(TradeRepublicImporter().load(CSV_FILE))
+    sale = Sale(
+        datetime=datetime(2026, 8, 10, tzinfo=timezone.utc),
+        symbol="IE00B4L5Y983",
+        shares=Decimal("0.1"),
+        amount=Decimal("150"),
+        price=Decimal("1500"),
+    )
+    portfolio = PortfolioEngine().build(
+        TradeRepublicImporter().load(CSV_FILE),
+        sales=[sale],
+    )
+    position = portfolio.positions["IE00B4L5Y983"]
+    assert position.shares == base.positions["IE00B4L5Y983"].shares - Decimal("0.1")
+    assert portfolio.cash == base.cash + Decimal("150")
 
 
 def test_apply_investment_reduces_cash_and_increases_position():
