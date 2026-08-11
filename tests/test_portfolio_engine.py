@@ -133,12 +133,24 @@ def test_sell_records_realized_gain_loss():
 def test_sell_records_realized_loss():
     importer = TradeRepublicImporter()
     movements = importer.load(CSV_FILE)
-    movements.append(_sell_movement(amount="80", transaction_id="test-sell-loss"))
-    portfolio = PortfolioEngine().build(movements)
+
+    before = PortfolioEngine().build(movements)
+
+    movements.append(
+        _sell_movement(
+            amount="10",
+            transaction_id="test-sell-loss",
+        )
+    )
+
+    after = PortfolioEngine().build(movements)
+
+    realized_change = after.realized_gain_loss - before.realized_gain_loss
     average_price = Decimal("100") / Decimal("0.792682")
-    expected_realized = Decimal("80") - (average_price * Decimal("0.1"))
-    assert portfolio.realized_gain_loss < Decimal("0")
-    assert portfolio.realized_gain_loss.quantize(Decimal("0.0000000001")) == expected_realized.quantize(Decimal("0.0000000001"))
+    expected_realized = Decimal("10") - (average_price * Decimal("0.1"))
+
+    assert realized_change < Decimal("0")
+    assert realized_change.quantize(Decimal("0.0000000001")) == expected_realized.quantize(Decimal("0.0000000001"))
 
 
 def test_sell_rejects_more_shares_than_position():
