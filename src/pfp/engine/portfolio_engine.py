@@ -92,6 +92,7 @@ class PortfolioEngine:
                     shares=investment.shares,
                     amount=investment.amount,
                     portfolio_class=investment.portfolio_class,
+                    allow_insufficient_cash=True,
                 )
 
         portfolio.invested = sum(
@@ -152,6 +153,7 @@ class PortfolioEngine:
         shares,
         amount,
         portfolio_class=None,
+        allow_insufficient_cash=False,
     ):
 
         shares = Decimal(str(shares))
@@ -167,7 +169,10 @@ class PortfolioEngine:
                 "Amount must be greater than zero"
             )
 
-        if portfolio.cash < amount:
+        if (
+            not allow_insufficient_cash
+            and portfolio.cash < amount
+        ):
             raise ValueError(
                 "Insufficient cash"
             )
