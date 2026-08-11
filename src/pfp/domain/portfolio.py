@@ -18,3 +18,5 @@ class Portfolio:
     cash: Decimal = Decimal("0")
 
     invested: Decimal = Decimal("0")
+
+    realized_gain_loss: Decimal = Decimal("0")
