@@ -247,6 +247,19 @@ def run_recommend(
         )
 
     print()
+    print("Comandos ejecutables:")
+    print()
+
+    for order in recommendation.orders:
+
+        print(
+            "  python -m pfp invest-order "
+            f"{order.symbol} "
+            f"{order.amount:.2f} "
+            f"{movements_file}"
+        )
+
+    print()
 
     print(
         f"TOTAL             : "
