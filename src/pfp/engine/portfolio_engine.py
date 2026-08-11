@@ -8,7 +8,7 @@ from pfp.domain.position import Position
 
 class PortfolioEngine:
 
-    def build(self, movements, prices=None, investments=None):
+    def build(self, movements, prices=None, investments=None, sales=None):
         portfolio = Portfolio()
         portfolio.movements = movements
         accounts = {}
@@ -34,7 +34,23 @@ class PortfolioEngine:
                 self._apply_sell(portfolio, movement.symbol, movement.shares, movement.amount)
         if investments is not None:
             for investment in investments:
-                self._apply_buy(portfolio, investment.symbol, investment.symbol, investment.shares, investment.amount, investment.portfolio_class, allow_insufficient_cash=True)
+                self._apply_buy(
+                    portfolio,
+                    investment.symbol,
+                    investment.symbol,
+                    investment.shares,
+                    investment.amount,
+                    investment.portfolio_class,
+                    allow_insufficient_cash=True,
+                )
+        if sales is not None:
+            for sale in sales:
+                self._apply_sell(
+                    portfolio,
+                    sale.symbol,
+                    sale.shares,
+                    sale.amount,
+                )
         portfolio.invested = sum(position.invested for position in portfolio.positions.values())
         for position in portfolio.positions.values():
             if position.shares:
@@ -49,6 +65,11 @@ class PortfolioEngine:
 
     def apply_investment(self, portfolio, investment):
         self._apply_buy(portfolio, investment.symbol, investment.symbol, investment.shares, investment.amount, investment.portfolio_class)
+        portfolio.invested = sum(position.invested for position in portfolio.positions.values())
+        return portfolio
+
+    def apply_sale(self, portfolio, sale):
+        self._apply_sell(portfolio, sale.symbol, sale.shares, sale.amount)
         portfolio.invested = sum(position.invested for position in portfolio.positions.values())
         return portfolio
 
