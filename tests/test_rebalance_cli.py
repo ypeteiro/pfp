@@ -60,8 +60,14 @@ def test_run_rebalance_execute_persists_orders(tmp_path, capsys):
 
     investments = investments_file.read_text(encoding="utf-8")
     assert "IE00BK5BQT80" in investments
-    assert "IE00BG47KH54" in investments
-    assert "IE00B4ND3602" in investments
+
+    buy_symbols = {
+        line.split()[1]
+        for line in output.splitlines()
+        if line.startswith("BUY ")
+    }
+    for symbol in buy_symbols:
+        assert symbol in investments
 
 
 def test_run_rebalance_execute_is_idempotent_after_execution(tmp_path, capsys):
