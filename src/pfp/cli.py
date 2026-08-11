@@ -7,6 +7,7 @@ from pfp.cli_output import print_portfolio
 from pfp.domain.sale import Sale
 from pfp.engine.investment_engine import InvestmentEngine
 from pfp.engine.portfolio_engine import PortfolioEngine
+from pfp.engine.rebalance_engine import RebalanceEngine
 from pfp.engine.recommendation_engine import RecommendationEngine
 from pfp.importers.investment_repository import InvestmentRepository
 from pfp.importers.sale_repository import SaleRepository
@@ -33,6 +34,11 @@ def build_parser():
     recommend_parser.add_argument("movements_file")
     recommend_parser.add_argument("--investments-file", default=DEFAULT_INVESTMENTS_FILE)
     recommend_parser.add_argument("--sales-file", default=DEFAULT_SALES_FILE)
+
+    rebalance_parser = subparsers.add_parser("rebalance", help="Calculate orders needed to rebalance the portfolio")
+    rebalance_parser.add_argument("movements_file")
+    rebalance_parser.add_argument("--investments-file", default=DEFAULT_INVESTMENTS_FILE)
+    rebalance_parser.add_argument("--sales-file", default=DEFAULT_SALES_FILE)
 
     invest_parser = subparsers.add_parser("invest", help="Register an executed investment")
     invest_parser.add_argument("symbol")
@@ -109,6 +115,66 @@ def run_recommend(amount, movements_file, investments_file=DEFAULT_INVESTMENTS_F
         )
     print()
     print(f"TOTAL             : {recommendation.total_amount:.2f} €")
+    print()
+
+
+def run_rebalance(movements_file, investments_file=DEFAULT_INVESTMENTS_FILE, sales_file=DEFAULT_SALES_FILE, price_provider=None):
+    portfolio = load_portfolio(movements_file, investments_file, sales_file)
+    price_provider = price_provider or CompositePriceProvider()
+    prices = price_provider.get_prices(list(portfolio.positions.keys()))
+    portfolio = PortfolioEngine().build(
+        TradeRepublicImporter().load(movements_file),
+        prices,
+        investments=InvestmentRepository(investments_file).load(),
+        sales=SaleRepository(sales_file).load(),
+    )
+    rebalance = RebalanceEngine().rebalance(portfolio)
+
+    print()
+    print("========== REBALANCEO ==========")
+    print()
+    print(f"Patrimonio       : {rebalance.total_value:.2f} €")
+    print()
+    print("## ASIGNACIÓN")
+    print()
+    for allocation in rebalance.allocations:
+        print(
+            f"{allocation.portfolio_class:<16}"
+            f" actual {allocation.current_percent:7.2f} %"
+            f" objetivo {allocation.target_percent:7.2f} %"
+            f" diferencia {allocation.difference_percent:7.2f} %"
+        )
+    print()
+    print("## ÓRDENES")
+    print()
+    if not rebalance.orders:
+        print("Portfolio ya rebalanceado.")
+    else:
+        for order in rebalance.orders:
+            print(
+                f"{order.action:<5}"
+                f" {order.symbol:<18}"
+                f" {order.amount:10.2f} €"
+                f" ({order.portfolio_class})"
+            )
+        print()
+        print("Comandos ejecutables:")
+        print()
+        for order in rebalance.orders:
+            if order.action == "BUY":
+                print(
+                    "  python -m pfp invest-order "
+                    f"{order.symbol} {order.amount:.2f} {movements_file}"
+                    f" --investments-file {investments_file}"
+                    f" --sales-file {sales_file}"
+                )
+            else:
+                print(
+                    "  python -m pfp sell "
+                    f"{order.symbol} {order.shares} {order.amount:.2f} {movements_file}"
+                    f" --investments-file {investments_file}"
+                    f" --sales-file {sales_file}"
+                )
     print()
 
 
@@ -211,6 +277,8 @@ def main():
         run_portfolio(args.movements_file)
     elif args.command == "recommend":
         run_recommend(args.amount, args.movements_file, args.investments_file, args.sales_file)
+    elif args.command == "rebalance":
+        run_rebalance(args.movements_file, args.investments_file, args.sales_file)
     elif args.command == "invest":
         run_invest(args.symbol, args.shares, args.amount, args.portfolio_class, args.movements_file, args.investments_file, args.sales_file)
     elif args.command == "invest-order":
