@@ -1,5 +1,6 @@
 import argparse
 import hashlib
+from dataclasses import replace
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
@@ -283,16 +284,7 @@ def run_invest(
         portfolio_class=portfolio_class,
         datetime=datetime.now(timezone.utc),
     )
-    investment = investment.__class__(
-        datetime=investment.datetime,
-        symbol=investment.symbol,
-        shares=investment.shares,
-        amount=investment.amount,
-        price=investment.price,
-        portfolio_class=investment.portfolio_class,
-        broker=investment.broker,
-        operation_id=operation_id,
-    )
+    investment = replace(investment, operation_id=operation_id)
     InvestmentRepository(investments_file).save(investment)
     portfolio = load_portfolio(movements_file, investments_file, sales_file)
     position = portfolio.positions.get(symbol)
