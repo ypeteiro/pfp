@@ -11,3 +11,4 @@ class Sale:
     amount: Decimal
     price: Decimal
     broker: str = "Trade Republic"
+    operation_id: str | None = None
