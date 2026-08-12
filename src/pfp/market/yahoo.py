@@ -44,63 +44,51 @@ class YahooFinancePriceProvider:
         prices: dict[str, Decimal] = {}
 
         for symbol in symbols:
+            try:
+                yahoo_symbol = YAHOO_SYMBOLS.get(symbol)
 
-            yahoo_symbol = YAHOO_SYMBOLS.get(
-                symbol
-            )
+                if yahoo_symbol is None:
+                    continue
 
-            if yahoo_symbol is None:
-                continue
+                ticker = yf.Ticker(yahoo_symbol)
 
-            ticker = yf.Ticker(
-                yahoo_symbol
-            )
+                history = ticker.history(
+                    period="1d",
+                    auto_adjust=False,
+                )
 
-            history = ticker.history(
-                period="1d",
-                auto_adjust=False,
-            )
+                if history.empty:
+                    continue
 
-            if history.empty:
-                continue
+                close = history["Close"].iloc[-1]
 
-            close = history["Close"].iloc[-1]
+                if close is None:
+                    continue
 
-            if close is None:
-                continue
+                currency = ticker.fast_info.get("currency")
 
-            currency = ticker.fast_info.get(
-                "currency"
-            )
+                if currency is None:
+                    continue
 
-            if currency is None:
-                continue
-
-            normalized_currency = (
-                YAHOO_CURRENCY_NORMALIZATION.get(
+                normalized_currency = YAHOO_CURRENCY_NORMALIZATION.get(
                     currency,
                     currency,
                 )
-            )
 
-            price = normalize_price(
-                Decimal(str(close)),
-                currency,
-            )
+                price = normalize_price(
+                    Decimal(str(close)),
+                    currency,
+                )
 
-            if normalized_currency != "EUR":
-
-                exchange_rate = (
-                    self.currency_rate_provider.get_rate(
+                if normalized_currency != "EUR":
+                    exchange_rate = self.currency_rate_provider.get_rate(
                         normalized_currency,
                         "EUR",
                     )
-                )
+                    price *= exchange_rate
 
-                price *= exchange_rate
-
-            prices[symbol] = price.quantize(
-                Decimal("0.01")
-            )
+                prices[symbol] = price.quantize(Decimal("0.01"))
+            except Exception:
+                continue
 
         return prices
