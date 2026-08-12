@@ -14,7 +14,7 @@ class HistoryPoint:
     cumulative_capital_flow: Decimal
     performance: Decimal
     performance_percent: Decimal
-    time_weighted_return: Decimal
+    time_weighted_return: Decimal | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,12 +67,15 @@ class History:
     @property
     def time_weighted_return(self):
         if not self.points:
-            return Decimal("0")
+            return None
         return self.points[-1].time_weighted_return
 
     @property
     def time_weighted_return_percent(self):
-        return self.time_weighted_return * Decimal("100")
+        value = self.time_weighted_return
+        if value is None:
+            return None
+        return value * Decimal("100")
 
 
 class HistoryEngine:
@@ -144,7 +147,11 @@ class HistoryEngine:
                 else Decimal("0")
             )
 
-            time_weighted_return = cumulative_twr_factor - Decimal("1")
+            time_weighted_return = (
+                None
+                if previous_snapshot_date is None
+                else cumulative_twr_factor - Decimal("1")
+            )
 
             points.append(
                 HistoryPoint(
