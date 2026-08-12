@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from decimal import Decimal
 
+from pfp.domain.capital_flow import CapitalFlow, FlowType
 from pfp.domain.snapshot import PortfolioSnapshot
 from pfp.engine.history_engine import HistoryEngine
 
@@ -44,6 +45,8 @@ def test_history_empty():
     assert history.current_value == Decimal("0")
     assert history.total_change == Decimal("0")
     assert history.total_change_percent == Decimal("0")
+    assert history.cumulative_capital_flow == Decimal("0")
+    assert history.total_performance == Decimal("0")
 
 
 def test_history_handles_zero_previous_value():
@@ -54,3 +57,43 @@ def test_history_handles_zero_previous_value():
 
     assert history.points[1].change == Decimal("100")
     assert history.points[1].change_percent == Decimal("0")
+
+
+def test_history_excludes_contributions_from_performance():
+    history = HistoryEngine().build(
+        [_snapshot(10, "20000"), _snapshot(11, "20850")],
+        [
+            CapitalFlow(
+                datetime=datetime(2026, 8, 11, 12, tzinfo=timezone.utc),
+                amount=Decimal("800"),
+                flow_type=FlowType.CONTRIBUTION,
+            )
+        ],
+    )
+
+    point = history.points[1]
+
+    assert point.capital_flow == Decimal("800")
+    assert point.cumulative_capital_flow == Decimal("800")
+    assert point.performance == Decimal("50")
+    assert point.performance_percent == Decimal("0.25")
+    assert history.total_performance == Decimal("50")
+
+
+def test_history_includes_withdrawals_in_net_capital_flow():
+    history = HistoryEngine().build(
+        [_snapshot(10, "20000"), _snapshot(12, "19400")],
+        [
+            CapitalFlow(
+                datetime=datetime(2026, 8, 11, tzinfo=timezone.utc),
+                amount=Decimal("1000"),
+                flow_type=FlowType.WITHDRAWAL,
+            )
+        ],
+    )
+
+    point = history.points[1]
+
+    assert point.capital_flow == Decimal("-1000")
+    assert point.cumulative_capital_flow == Decimal("-1000")
+    assert point.performance == Decimal("400")
