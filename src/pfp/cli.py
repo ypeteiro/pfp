@@ -212,7 +212,11 @@ def run_rebalance(
     print()
     print("========== REBALANCEO ==========")
     print()
-    print(f"Patrimonio       : {rebalance.total_value:.2f} €")
+    print(f"Patrimonio total        : {rebalance.total_value:.2f} €")
+    print(f"Patrimonio rebalanceable: {rebalance.rebalanceable_value:.2f} €")
+    excluded_value = rebalance.total_value - rebalance.rebalanceable_value
+    if excluded_value > 0:
+        print(f"No rebalanceable        : {excluded_value:.2f} €")
     print()
     print("## ASIGNACIÓN")
     print()
