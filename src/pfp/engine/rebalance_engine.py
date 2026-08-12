@@ -28,6 +28,7 @@ class RebalanceAllocation:
 @dataclass(frozen=True, slots=True)
 class Rebalance:
     total_value: Decimal
+    rebalanceable_value: Decimal
     allocations: tuple[RebalanceAllocation, ...]
     orders: tuple[RebalanceOrder, ...]
 
@@ -50,8 +51,17 @@ class RebalanceEngine:
             portfolio_class: []
             for portfolio_class in self.target_allocation
         }
+        market_value = portfolio.cash
 
         for position in portfolio.positions.values():
+            if position.market_price is None:
+                raise ValueError(
+                    f"Market price is not available for {position.symbol}"
+                )
+
+            position_value = position.market_value
+            market_value += position_value
+
             portfolio_class = getattr(
                 position,
                 "portfolio_class",
@@ -59,16 +69,16 @@ class RebalanceEngine:
             )
             if portfolio_class not in class_values:
                 continue
-            if position.market_price is None:
-                raise ValueError(
-                    f"Market price is not available for {position.symbol}"
-                )
-            class_values[portfolio_class] += position.market_value
+
+            class_values[portfolio_class] += position_value
             positions_by_class[portfolio_class].append(position)
 
-        total_value = portfolio.cash + sum(class_values.values())
-        if total_value <= 0:
+        rebalanceable_value = portfolio.cash + sum(class_values.values())
+
+        if market_value <= 0:
             raise ValueError("Portfolio has no value to rebalance")
+        if rebalanceable_value <= 0:
+            raise ValueError("Portfolio has no rebalanceable value")
 
         allocations = []
         orders = []
@@ -76,10 +86,10 @@ class RebalanceEngine:
         for portfolio_class, target_percent in self.target_allocation.items():
             current_value = class_values[portfolio_class]
             current_percent = (
-                current_value / total_value * Decimal("100")
+                current_value / rebalanceable_value * Decimal("100")
             )
             target_value = (
-                total_value * target_percent / Decimal("100")
+                rebalanceable_value * target_percent / Decimal("100")
             )
             difference_value = target_value - current_value
             difference_percent = target_percent - current_percent
@@ -130,7 +140,8 @@ class RebalanceEngine:
                 )
 
         return Rebalance(
-            total_value=total_value,
+            total_value=market_value,
+            rebalanceable_value=rebalanceable_value,
             allocations=tuple(allocations),
             orders=tuple(orders),
         )
