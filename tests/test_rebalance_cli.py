@@ -1,7 +1,7 @@
 from decimal import Decimal
 from pathlib import Path
 
-from pfp.cli import run_rebalance
+from pfp.cli import load_portfolio, run_rebalance
 
 
 MOVEMENTS_FILE = Path("data/imports/trade_republic.csv")
@@ -124,3 +124,47 @@ def test_run_rebalance_execute_rejects_changed_portfolio(tmp_path):
 
     assert not investments_file.exists()
     assert not sales_file.exists()
+
+
+def test_rebalance_execution_round_trip_reloads_consistent_portfolio(tmp_path, capsys):
+    investments_file = tmp_path / "investments.csv"
+    sales_file = tmp_path / "sales.csv"
+    provider = _price_provider()
+
+    before = load_portfolio(
+        MOVEMENTS_FILE,
+        investments_file,
+        sales_file,
+    )
+    initial_cash = before.cash
+
+    run_rebalance(
+        MOVEMENTS_FILE,
+        investments_file,
+        sales_file,
+        price_provider=provider,
+        execute=True,
+    )
+    capsys.readouterr()
+
+    after = load_portfolio(
+        MOVEMENTS_FILE,
+        investments_file,
+        sales_file,
+    )
+
+    assert investments_file.exists()
+    assert after.cash < initial_cash
+    assert after.invested > before.invested
+
+    persisted_symbols = {
+        row.split(",")[1]
+        for row in investments_file.read_text(encoding="utf-8").splitlines()[1:]
+    }
+    assert persisted_symbols
+    assert persisted_symbols.issubset(after.positions)
+
+    sales = sales_file.read_text(encoding="utf-8") if sales_file.exists() else ""
+    assert sales_file.exists() is ("SELL" in capsys.readouterr().out)
+    if sales:
+        assert "IE00" in sales
