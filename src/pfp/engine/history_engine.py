@@ -14,6 +14,7 @@ class HistoryPoint:
     cumulative_capital_flow: Decimal
     performance: Decimal
     performance_percent: Decimal
+    time_weighted_return: Decimal
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,6 +64,16 @@ class History:
             return Decimal("0")
         return self.total_performance / initial_value * Decimal("100")
 
+    @property
+    def time_weighted_return(self):
+        if not self.points:
+            return Decimal("0")
+        return self.points[-1].time_weighted_return
+
+    @property
+    def time_weighted_return_percent(self):
+        return self.time_weighted_return * Decimal("100")
+
 
 class HistoryEngine:
     def build(self, snapshots, capital_flows=None):
@@ -78,6 +89,7 @@ class HistoryEngine:
         cumulative_flow = Decimal("0")
         previous_snapshot_date = None
         initial_period_flow = Decimal("0")
+        cumulative_twr_factor = Decimal("1")
 
         for snapshot in ordered:
             if previous_value is None:
@@ -120,11 +132,17 @@ class HistoryEngine:
                 post_initial_flow = cumulative_flow - initial_period_flow
                 performance = snapshot.total_value - initial_value - post_initial_flow
 
+                if previous_value != 0:
+                    period_end_ex_flow = snapshot.total_value - period_flow
+                    cumulative_twr_factor *= period_end_ex_flow / previous_value
+
             performance_percent = (
                 performance / initial_value * Decimal("100")
                 if initial_value != 0
                 else Decimal("0")
             )
+
+            time_weighted_return = cumulative_twr_factor - Decimal("1")
 
             points.append(
                 HistoryPoint(
@@ -135,6 +153,7 @@ class HistoryEngine:
                     cumulative_capital_flow=cumulative_flow,
                     performance=performance,
                     performance_percent=performance_percent,
+                    time_weighted_return=time_weighted_return,
                 )
             )
             previous_value = snapshot.total_value
