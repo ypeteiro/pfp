@@ -7,9 +7,7 @@ from pfp.importers.investment_repository import InvestmentRepository
 from pfp.importers.sale_repository import SaleRepository
 
 
-MOVEMENTS_FILE = Path(
-    "data/imports/trade_republic.csv"
-)
+MOVEMENTS_FILE = Path("data/imports/trade_republic.csv")
 
 
 def test_run_invest_persists_investment(tmp_path):
@@ -210,3 +208,22 @@ def test_run_sell_rejects_more_shares_than_position(tmp_path):
         assert str(error) == "Insufficient shares"
     else:
         raise AssertionError("Expected ValueError")
+
+
+def test_run_invest_with_same_operation_id_is_idempotent(tmp_path):
+    investments_file = tmp_path / "investments.csv"
+
+    for _ in range(2):
+        run_invest(
+            symbol="TEST",
+            shares=Decimal("2"),
+            amount=Decimal("200"),
+            portfolio_class="EQUITY",
+            movements_file=MOVEMENTS_FILE,
+            investments_file=investments_file,
+            operation_id="rebalance-1",
+        )
+
+    investments = InvestmentRepository(investments_file).load()
+    assert len(investments) == 1
+    assert investments[0].operation_id == "rebalance-1"
