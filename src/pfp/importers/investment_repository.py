@@ -16,6 +16,7 @@ class InvestmentRepository:
         "price",
         "portfolio_class",
         "broker",
+        "operation_id",
     )
 
     def __init__(self, path):
@@ -43,19 +44,12 @@ class InvestmentRepository:
                             row["datetime"]
                         ),
                         symbol=row["symbol"],
-                        shares=Decimal(
-                            row["shares"]
-                        ),
-                        amount=Decimal(
-                            row["amount"]
-                        ),
-                        price=Decimal(
-                            row["price"]
-                        ),
-                        portfolio_class=row[
-                            "portfolio_class"
-                        ],
+                        shares=Decimal(row["shares"]),
+                        amount=Decimal(row["amount"]),
+                        price=Decimal(row["price"]),
+                        portfolio_class=row["portfolio_class"],
                         broker=row["broker"],
+                        operation_id=row.get("operation_id") or None,
                     )
                 )
 
@@ -66,6 +60,13 @@ class InvestmentRepository:
             parents=True,
             exist_ok=True,
         )
+
+        if investment.operation_id is not None:
+            if any(
+                existing.operation_id == investment.operation_id
+                for existing in self.load()
+            ):
+                return
 
         file_exists = self.path.exists()
 
@@ -85,22 +86,13 @@ class InvestmentRepository:
 
             writer.writerow(
                 {
-                    "datetime": (
-                        investment.datetime.isoformat()
-                    ),
+                    "datetime": investment.datetime.isoformat(),
                     "symbol": investment.symbol,
-                    "shares": str(
-                        investment.shares
-                    ),
-                    "amount": str(
-                        investment.amount
-                    ),
-                    "price": str(
-                        investment.price
-                    ),
-                    "portfolio_class": (
-                        investment.portfolio_class
-                    ),
+                    "shares": str(investment.shares),
+                    "amount": str(investment.amount),
+                    "price": str(investment.price),
+                    "portfolio_class": investment.portfolio_class,
                     "broker": investment.broker,
+                    "operation_id": investment.operation_id or "",
                 }
             )
