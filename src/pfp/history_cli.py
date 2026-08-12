@@ -26,7 +26,7 @@ def run_history(snapshots_file=DEFAULT_SNAPSHOTS_FILE, movements_file=None):
 
     print(
         "Fecha                      Patrimonio       Flujo       "
-        "Aportado    Rentabilidad"
+        "Aportado    Rentabilidad      TWR"
     )
     for point in history.points:
         print(
@@ -35,6 +35,7 @@ def run_history(snapshots_file=DEFAULT_SNAPSHOTS_FILE, movements_file=None):
             f" {point.capital_flow:>10.2f} €"
             f" {point.cumulative_capital_flow:>10.2f} €"
             f" {point.performance:>13.2f} €"
+            f" {point.time_weighted_return * 100:>10.2f} %"
         )
 
     print()
@@ -43,6 +44,7 @@ def run_history(snapshots_file=DEFAULT_SNAPSHOTS_FILE, movements_file=None):
     print(f"Capital aportado neto: {history.cumulative_capital_flow:.2f} €")
     print(f"Rentabilidad        : {history.total_performance:.2f} €")
     print(f"Rentabilidad %      : {history.total_performance_percent:.2f} %")
+    print(f"Rentabilidad TWR    : {history.time_weighted_return_percent:.2f} %")
     print()
 
     if movements_file is None:
