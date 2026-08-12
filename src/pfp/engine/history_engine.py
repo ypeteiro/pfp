@@ -3,6 +3,7 @@ from decimal import Decimal, localcontext
 
 from pfp.domain.capital_flow import CapitalFlow
 from pfp.domain.snapshot import PortfolioSnapshot
+from pfp.engine.xirr_engine import XirrEngine
 
 
 @dataclass(frozen=True, slots=True)
@@ -20,6 +21,7 @@ class HistoryPoint:
 @dataclass(frozen=True, slots=True)
 class History:
     points: tuple[HistoryPoint, ...]
+    xirr: Decimal | None = None
 
     @property
     def initial_value(self):
@@ -77,8 +79,17 @@ class History:
             return None
         return value * Decimal("100")
 
+    @property
+    def xirr_percent(self):
+        if self.xirr is None:
+            return None
+        return self.xirr * Decimal("100")
+
 
 class HistoryEngine:
+    def __init__(self, xirr_engine=None):
+        self.xirr_engine = xirr_engine or XirrEngine()
+
     def build(self, snapshots, capital_flows=None):
         ordered = sorted(snapshots, key=lambda snapshot: snapshot.datetime)
         flows = sorted(capital_flows or [], key=lambda flow: flow.datetime)
@@ -109,11 +120,7 @@ class HistoryEngine:
             snapshot_date = snapshot.datetime.date()
             if previous_snapshot_date is None:
                 period_flow = sum(
-                    (
-                        flow.signed_amount
-                        for flow in flows
-                        if flow.datetime.date() <= snapshot_date
-                    ),
+                    (flow.signed_amount for flow in flows if flow.datetime.date() <= snapshot_date),
                     Decimal("0"),
                 )
                 initial_period_flow = period_flow
@@ -142,15 +149,11 @@ class HistoryEngine:
                         cumulative_twr_factor *= period_end_ex_flow / previous_value
 
             performance_percent = (
-                performance / initial_value * Decimal("100")
-                if initial_value != 0
-                else Decimal("0")
+                performance / initial_value * Decimal("100") if initial_value != 0 else Decimal("0")
             )
 
             time_weighted_return = (
-                None
-                if previous_snapshot_date is None
-                else cumulative_twr_factor - Decimal("1")
+                None if previous_snapshot_date is None else cumulative_twr_factor - Decimal("1")
             )
 
             points.append(
@@ -168,4 +171,5 @@ class HistoryEngine:
             previous_value = snapshot.total_value
             previous_snapshot_date = snapshot_date
 
-        return History(points=tuple(points))
+        xirr = self.xirr_engine.calculate(flows, ordered[-1].total_value, ordered[-1].datetime)
+        return History(points=tuple(points), xirr=xirr)
