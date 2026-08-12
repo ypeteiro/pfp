@@ -145,7 +145,7 @@ def test_rebalance_execution_round_trip_reloads_consistent_portfolio(tmp_path, c
         price_provider=provider,
         execute=True,
     )
-    capsys.readouterr()
+    execute_output = capsys.readouterr().out
 
     after = load_portfolio(
         MOVEMENTS_FILE,
@@ -165,6 +165,6 @@ def test_rebalance_execution_round_trip_reloads_consistent_portfolio(tmp_path, c
     assert persisted_symbols.issubset(after.positions)
 
     sales = sales_file.read_text(encoding="utf-8") if sales_file.exists() else ""
-    assert sales_file.exists() is ("SELL" in capsys.readouterr().out)
+    assert sales_file.exists() is ("SELL" in execute_output)
     if sales:
         assert "IE00" in sales
