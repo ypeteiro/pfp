@@ -1,13 +1,42 @@
 import argparse
+import io
+from contextlib import redirect_stdout
 
+from pfp.cli import run_snapshot
 from pfp.engine.history_engine import HistoryEngine
 from pfp.importers.snapshot_repository import SnapshotRepository
 from pfp.importers.trade_republic import TradeRepublicImporter
 
 DEFAULT_SNAPSHOTS_FILE = "data/imports/snapshots.csv"
+DEFAULT_MOVEMENTS_FILE = "data/imports/trade_republic.csv"
+DEFAULT_INVESTMENTS_FILE = "data/imports/investments.csv"
+DEFAULT_SALES_FILE = "data/imports/sales.csv"
 
 
-def run_history(snapshots_file=DEFAULT_SNAPSHOTS_FILE, movements_file=None):
+def _capture_current_snapshot(movements_file, snapshots_file, investments_file, sales_file):
+    with redirect_stdout(io.StringIO()):
+        run_snapshot(
+            movements_file,
+            snapshots_file=snapshots_file,
+            investments_file=investments_file,
+            sales_file=sales_file,
+        )
+
+
+def run_history(
+    snapshots_file=DEFAULT_SNAPSHOTS_FILE,
+    movements_file=None,
+    investments_file=DEFAULT_INVESTMENTS_FILE,
+    sales_file=DEFAULT_SALES_FILE,
+):
+    if movements_file is not None:
+        _capture_current_snapshot(
+            movements_file,
+            snapshots_file,
+            investments_file,
+            sales_file,
+        )
+
     snapshots = SnapshotRepository(snapshots_file).load()
     capital_flows = []
     if movements_file is not None:
@@ -69,6 +98,13 @@ def run_history(snapshots_file=DEFAULT_SNAPSHOTS_FILE, movements_file=None):
 def main(argv=None):
     parser = argparse.ArgumentParser(prog="pfp history")
     parser.add_argument("--snapshots-file", default=DEFAULT_SNAPSHOTS_FILE)
-    parser.add_argument("--movements-file")
+    parser.add_argument("--movements-file", default=None)
+    parser.add_argument("--investments-file", default=DEFAULT_INVESTMENTS_FILE)
+    parser.add_argument("--sales-file", default=DEFAULT_SALES_FILE)
     args = parser.parse_args(argv)
-    run_history(args.snapshots_file, args.movements_file)
+    run_history(
+        args.snapshots_file,
+        args.movements_file,
+        args.investments_file,
+        args.sales_file,
+    )
