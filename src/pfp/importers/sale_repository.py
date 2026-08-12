@@ -14,6 +14,7 @@ class SaleRepository:
         "amount",
         "price",
         "broker",
+        "operation_id",
     )
 
     def __init__(self, path):
@@ -33,12 +34,21 @@ class SaleRepository:
                     amount=Decimal(row["amount"]),
                     price=Decimal(row["price"]),
                     broker=row["broker"],
+                    operation_id=row.get("operation_id") or None,
                 )
                 for row in reader
             ]
 
     def save(self, sale):
         self.path.parent.mkdir(parents=True, exist_ok=True)
+
+        if sale.operation_id is not None:
+            if any(
+                existing.operation_id == sale.operation_id
+                for existing in self.load()
+            ):
+                return
+
         file_exists = self.path.exists()
 
         with self.path.open("a", encoding="utf-8", newline="") as file:
@@ -53,5 +63,6 @@ class SaleRepository:
                     "amount": str(sale.amount),
                     "price": str(sale.price),
                     "broker": sale.broker,
+                    "operation_id": sale.operation_id or "",
                 }
             )
