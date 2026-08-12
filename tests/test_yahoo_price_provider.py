@@ -146,9 +146,9 @@ def test_yahoo_provider_keeps_eur_price_without_fx(monkeypatch):
         currency_rate_provider=FailingCurrencyRateProvider()
     )
 
-    prices = provider.get_prices(["EUNL.DE"])
+    prices = provider.get_prices(["IE00B4L5Y983"])
 
-    assert prices == {"EUNL.DE": Decimal("100.00")}
+    assert prices == {"IE00B4L5Y983": Decimal("100.00")}
 
 
 def test_yahoo_provider_skips_only_symbol_when_fx_fails(monkeypatch):
@@ -158,6 +158,6 @@ def test_yahoo_provider_skips_only_symbol_when_fx_fails(monkeypatch):
         currency_rate_provider=FailingCurrencyRateProvider()
     )
 
-    prices = provider.get_prices(["IE00BK5BQT80", "EUNL.DE"])
+    prices = provider.get_prices(["IE00BK5BQT80", "IE00B4L5Y983"])
 
-    assert prices == {"EUNL.DE": Decimal("100.00")}
+    assert prices == {"IE00B4L5Y983": Decimal("100.00")}
