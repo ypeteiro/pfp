@@ -1,7 +1,10 @@
 from dataclasses import dataclass
 from decimal import Decimal
 
-from pfp.engine.recommendation_engine import TARGET_ALLOCATION
+from pfp.config import load_target_allocation
+
+
+TARGET_ALLOCATION = load_target_allocation()
 
 
 @dataclass(frozen=True, slots=True)
