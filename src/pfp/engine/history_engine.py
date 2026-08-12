@@ -56,9 +56,10 @@ class History:
 
     @property
     def total_performance_percent(self):
-        if self.initial_value == 0:
+        capital = self.cumulative_capital_flow
+        if capital == 0:
             return Decimal("0")
-        return self.total_performance / self.initial_value * Decimal("100")
+        return self.total_performance / capital * Decimal("100")
 
 
 class HistoryEngine:
@@ -70,10 +71,10 @@ class HistoryEngine:
         if not ordered:
             return History(points=())
 
-        initial_date = ordered[0].datetime.date()
         initial_value = ordered[0].total_value
         previous_value = None
         cumulative_flow = Decimal("0")
+        previous_snapshot_date = None
 
         for snapshot in ordered:
             if previous_value is None:
@@ -87,19 +88,31 @@ class HistoryEngine:
                     else Decimal("0")
                 )
 
-            period_flow = sum(
-                (
-                    flow.signed_amount
-                    for flow in flows
-                    if initial_date < flow.datetime.date() <= snapshot.datetime.date()
-                ),
-                Decimal("0"),
-            )
+            snapshot_date = snapshot.datetime.date()
+            if previous_snapshot_date is None:
+                period_flow = sum(
+                    (
+                        flow.signed_amount
+                        for flow in flows
+                        if flow.datetime.date() <= snapshot_date
+                    ),
+                    Decimal("0"),
+                )
+            else:
+                period_flow = sum(
+                    (
+                        flow.signed_amount
+                        for flow in flows
+                        if previous_snapshot_date < flow.datetime.date() <= snapshot_date
+                    ),
+                    Decimal("0"),
+                )
+
             cumulative_flow += period_flow
-            performance = snapshot.total_value - initial_value - cumulative_flow
+            performance = snapshot.total_value - cumulative_flow
             performance_percent = (
-                performance / initial_value * Decimal("100")
-                if initial_value != 0
+                performance / cumulative_flow * Decimal("100")
+                if cumulative_flow != 0
                 else Decimal("0")
             )
 
@@ -115,5 +128,6 @@ class HistoryEngine:
                 )
             )
             previous_value = snapshot.total_value
+            previous_snapshot_date = snapshot_date
 
         return History(points=tuple(points))
