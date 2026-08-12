@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from decimal import Decimal
+from decimal import Decimal, localcontext
 
 from pfp.domain.capital_flow import CapitalFlow
 from pfp.domain.snapshot import PortfolioSnapshot
@@ -134,7 +134,9 @@ class HistoryEngine:
 
                 if previous_value != 0:
                     period_end_ex_flow = snapshot.total_value - period_flow
-                    cumulative_twr_factor *= period_end_ex_flow / previous_value
+                    with localcontext() as context:
+                        context.prec = 40
+                        cumulative_twr_factor *= period_end_ex_flow / previous_value
 
             performance_percent = (
                 performance / initial_value * Decimal("100")
