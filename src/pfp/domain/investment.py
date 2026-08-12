@@ -12,3 +12,4 @@ class Investment:
     price: Decimal
     portfolio_class: str
     broker: str = "Trade Republic"
+    operation_id: str | None = None
