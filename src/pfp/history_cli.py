@@ -51,6 +51,12 @@ def run_history(snapshots_file=DEFAULT_SNAPSHOTS_FILE, movements_file=None):
         print("Rentabilidad TWR    : N/D (se necesitan al menos 2 snapshots)")
     else:
         print(f"Rentabilidad TWR    : {twr_percent:.2f} %")
+
+    xirr_percent = history.xirr_percent
+    if xirr_percent is None:
+        print("Rentabilidad XIRR   : N/D")
+    else:
+        print(f"Rentabilidad XIRR   : {xirr_percent:.2f} %")
     print()
 
     if movements_file is None:
