@@ -1,12 +1,10 @@
 from dataclasses import dataclass
 from decimal import Decimal
 
+from pfp.config import load_target_allocation
 
-TARGET_ALLOCATION = {
-    "EQUITY": Decimal("75"),
-    "FIXED_INCOME": Decimal("20"),
-    "GOLD": Decimal("5"),
-}
+
+TARGET_ALLOCATION = load_target_allocation()
 
 
 @dataclass(frozen=True, slots=True)
