@@ -27,22 +27,12 @@ class InvestmentRepository:
             return []
 
         investments = []
-
-        with self.path.open(
-            "r",
-            encoding="utf-8",
-            newline="",
-        ) as file:
-
+        with self.path.open("r", encoding="utf-8", newline="") as file:
             reader = csv.DictReader(file)
-
             for row in reader:
-
                 investments.append(
                     Investment(
-                        datetime=datetime.fromisoformat(
-                            row["datetime"]
-                        ),
+                        datetime=datetime.fromisoformat(row["datetime"]),
                         symbol=row["symbol"],
                         shares=Decimal(row["shares"]),
                         amount=Decimal(row["amount"]),
@@ -52,38 +42,37 @@ class InvestmentRepository:
                         operation_id=row.get("operation_id") or None,
                     )
                 )
-
         return investments
 
+    def _migrate_legacy_header(self):
+        with self.path.open("r", encoding="utf-8", newline="") as file:
+            reader = csv.DictReader(file)
+            if reader.fieldnames == list(self.FIELDNAMES):
+                return
+            rows = list(reader)
+
+        with self.path.open("w", encoding="utf-8", newline="") as file:
+            writer = csv.DictWriter(file, fieldnames=self.FIELDNAMES)
+            writer.writeheader()
+            for row in rows:
+                row["operation_id"] = row.get("operation_id") or ""
+                writer.writerow({field: row.get(field, "") for field in self.FIELDNAMES})
+
     def save(self, investment):
-        self.path.parent.mkdir(
-            parents=True,
-            exist_ok=True,
-        )
+        self.path.parent.mkdir(parents=True, exist_ok=True)
 
         if investment.operation_id is not None:
-            if any(
-                existing.operation_id == investment.operation_id
-                for existing in self.load()
-            ):
+            if any(existing.operation_id == investment.operation_id for existing in self.load()):
                 return
 
         file_exists = self.path.exists()
+        if file_exists:
+            self._migrate_legacy_header()
 
-        with self.path.open(
-            "a",
-            encoding="utf-8",
-            newline="",
-        ) as file:
-
-            writer = csv.DictWriter(
-                file,
-                fieldnames=self.FIELDNAMES,
-            )
-
+        with self.path.open("a", encoding="utf-8", newline="") as file:
+            writer = csv.DictWriter(file, fieldnames=self.FIELDNAMES)
             if not file_exists:
                 writer.writeheader()
-
             writer.writerow(
                 {
                     "datetime": investment.datetime.isoformat(),
