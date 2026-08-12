@@ -36,6 +36,7 @@ def test_history_captures_snapshot_when_movements_file_is_provided(tmp_path, mon
         SnapshotRepository(snapshots).save(_snapshot(11, "20500"))
 
     monkeypatch.setattr("pfp.history_cli._capture_current_snapshot", fake_capture)
+    monkeypatch.setattr("pfp.history_cli.TradeRepublicImporter.load_capital_flows", lambda self, path: [])
 
     history = run_history(snapshots_file, movements_file)
 
