@@ -5,8 +5,8 @@ from pfp.domain.snapshot import PortfolioSnapshot
 from pfp.importers.snapshot_repository import SnapshotRepository
 
 
-def _snapshot():
-    return PortfolioSnapshot(
+def _snapshot(**changes):
+    values = dict(
         datetime=datetime(2026, 8, 12, 12, 0, tzinfo=timezone.utc),
         total_value=Decimal("24859.21"),
         cash=Decimal("3303.39"),
@@ -19,6 +19,8 @@ def _snapshot():
         gold_value=Decimal("1000"),
         crypto_value=Decimal("98.99"),
     )
+    values.update(changes)
+    return PortfolioSnapshot(**values)
 
 
 def test_save_and_load_snapshot(tmp_path):
@@ -46,8 +48,9 @@ def test_save_multiple_snapshots(tmp_path):
     path = tmp_path / "snapshots.csv"
     repository = SnapshotRepository(path)
     first = _snapshot()
-    second = PortfolioSnapshot(
-        **{**first.__dict__, "datetime": datetime(2026, 8, 13, tzinfo=timezone.utc), "total_value": Decimal("25000")}
+    second = _snapshot(
+        datetime=datetime(2026, 8, 13, tzinfo=timezone.utc),
+        total_value=Decimal("25000"),
     )
 
     repository.save(first)
