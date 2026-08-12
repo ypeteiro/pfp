@@ -75,6 +75,7 @@ class HistoryEngine:
         previous_value = None
         cumulative_flow = Decimal("0")
         previous_snapshot_date = None
+        initial_period_flow = Decimal("0")
 
         for snapshot in ordered:
             if previous_value is None:
@@ -98,6 +99,7 @@ class HistoryEngine:
                     ),
                     Decimal("0"),
                 )
+                initial_period_flow = period_flow
             else:
                 period_flow = sum(
                     (
@@ -109,7 +111,13 @@ class HistoryEngine:
                 )
 
             cumulative_flow += period_flow
-            performance = snapshot.total_value - cumulative_flow
+
+            if previous_snapshot_date is None:
+                performance = snapshot.total_value - cumulative_flow
+            else:
+                post_initial_flow = cumulative_flow - initial_period_flow
+                performance = snapshot.total_value - initial_value - post_initial_flow
+
             performance_percent = (
                 performance / cumulative_flow * Decimal("100")
                 if cumulative_flow != 0
