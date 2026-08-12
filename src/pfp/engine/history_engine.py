@@ -56,10 +56,12 @@ class History:
 
     @property
     def total_performance_percent(self):
-        capital = self.cumulative_capital_flow
-        if capital == 0:
+        if not self.points:
             return Decimal("0")
-        return self.total_performance / capital * Decimal("100")
+        initial_value = self.initial_value
+        if initial_value == 0:
+            return Decimal("0")
+        return self.total_performance / initial_value * Decimal("100")
 
 
 class HistoryEngine:
@@ -119,8 +121,8 @@ class HistoryEngine:
                 performance = snapshot.total_value - initial_value - post_initial_flow
 
             performance_percent = (
-                performance / cumulative_flow * Decimal("100")
-                if cumulative_flow != 0
+                performance / initial_value * Decimal("100")
+                if initial_value != 0
                 else Decimal("0")
             )
 
