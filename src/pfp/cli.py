@@ -1,4 +1,5 @@
 import argparse
+import hashlib
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
@@ -134,6 +135,21 @@ def _build_rebalance(movements_file, investments_file, sales_file, price_provide
     return RebalanceEngine().rebalance(portfolio)
 
 
+def _rebalance_operation_id(rebalance, order):
+    payload = "|".join(
+        (
+            "rebalance",
+            str(rebalance.total_value),
+            order.action,
+            order.symbol,
+            order.portfolio_class,
+            str(order.amount),
+            str(order.shares),
+        )
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
 def _execute_rebalance(
     rebalance,
     movements_file,
@@ -151,6 +167,7 @@ def _execute_rebalance(
         raise ValueError("Portfolio changed since rebalance calculation")
 
     for order in rebalance.orders:
+        operation_id = _rebalance_operation_id(rebalance, order)
         if order.action == "SELL":
             run_sell(
                 symbol=order.symbol,
@@ -159,9 +176,11 @@ def _execute_rebalance(
                 movements_file=movements_file,
                 investments_file=investments_file,
                 sales_file=sales_file,
+                operation_id=operation_id,
             )
 
     for order in rebalance.orders:
+        operation_id = _rebalance_operation_id(rebalance, order)
         if order.action == "BUY":
             run_invest_order(
                 symbol=order.symbol,
@@ -170,6 +189,7 @@ def _execute_rebalance(
                 investments_file=investments_file,
                 sales_file=sales_file,
                 price_provider=price_provider,
+                operation_id=operation_id,
             )
 
 
@@ -246,13 +266,32 @@ def run_rebalance(
     print()
 
 
-def run_invest(symbol, shares, amount, portfolio_class, movements_file, investments_file, sales_file=DEFAULT_SALES_FILE):
+def run_invest(
+    symbol,
+    shares,
+    amount,
+    portfolio_class,
+    movements_file,
+    investments_file,
+    sales_file=DEFAULT_SALES_FILE,
+    operation_id=None,
+):
     investment = InvestmentEngine().create(
         symbol=symbol,
         shares=shares,
         amount=amount,
         portfolio_class=portfolio_class,
         datetime=datetime.now(timezone.utc),
+    )
+    investment = investment.__class__(
+        datetime=investment.datetime,
+        symbol=investment.symbol,
+        shares=investment.shares,
+        amount=investment.amount,
+        price=investment.price,
+        portfolio_class=investment.portfolio_class,
+        broker=investment.broker,
+        operation_id=operation_id,
     )
     InvestmentRepository(investments_file).save(investment)
     portfolio = load_portfolio(movements_file, investments_file, sales_file)
@@ -274,7 +313,15 @@ def run_invest(symbol, shares, amount, portfolio_class, movements_file, investme
     print()
 
 
-def run_invest_order(symbol, amount, movements_file, investments_file, price_provider=None, sales_file=DEFAULT_SALES_FILE):
+def run_invest_order(
+    symbol,
+    amount,
+    movements_file,
+    investments_file,
+    price_provider=None,
+    sales_file=DEFAULT_SALES_FILE,
+    operation_id=None,
+):
     amount = Decimal(str(amount))
     if amount <= 0:
         raise ValueError("Amount must be greater than zero")
@@ -298,10 +345,19 @@ def run_invest_order(symbol, amount, movements_file, investments_file, price_pro
         movements_file=movements_file,
         investments_file=investments_file,
         sales_file=sales_file,
+        operation_id=operation_id,
     )
 
 
-def run_sell(symbol, shares, amount, movements_file, sales_file=DEFAULT_SALES_FILE, investments_file=DEFAULT_INVESTMENTS_FILE):
+def run_sell(
+    symbol,
+    shares,
+    amount,
+    movements_file,
+    sales_file=DEFAULT_SALES_FILE,
+    investments_file=DEFAULT_INVESTMENTS_FILE,
+    operation_id=None,
+):
     shares = Decimal(str(shares))
     amount = Decimal(str(amount))
     if shares <= 0:
@@ -316,7 +372,14 @@ def run_sell(symbol, shares, amount, movements_file, sales_file=DEFAULT_SALES_FI
     if shares > position.shares:
         raise ValueError("Insufficient shares")
 
-    sale = Sale(datetime=datetime.now(timezone.utc), symbol=symbol, shares=shares, amount=amount, price=amount / shares)
+    sale = Sale(
+        datetime=datetime.now(timezone.utc),
+        symbol=symbol,
+        shares=shares,
+        amount=amount,
+        price=amount / shares,
+        operation_id=operation_id,
+    )
     SaleRepository(sales_file).save(sale)
 
     portfolio = load_portfolio(movements_file, investments_file, sales_file)
