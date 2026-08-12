@@ -70,7 +70,7 @@ class HistoryEngine:
         if not ordered:
             return History(points=())
 
-        initial_datetime = ordered[0].datetime
+        initial_date = ordered[0].datetime.date()
         initial_value = ordered[0].total_value
         previous_value = None
         cumulative_flow = Decimal("0")
@@ -91,7 +91,7 @@ class HistoryEngine:
                 (
                     flow.signed_amount
                     for flow in flows
-                    if initial_datetime < flow.datetime <= snapshot.datetime
+                    if initial_date < flow.datetime.date() <= snapshot.datetime.date()
                 ),
                 Decimal("0"),
             )
