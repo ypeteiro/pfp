@@ -79,9 +79,9 @@ class PortfolioReport:
         positions = []
         for position in sorted(portfolio.positions.values(), key=lambda item: item.symbol):
             asset = AssetCatalog.get(position.symbol)
-            market_price = position.market_price or (position.invested / position.shares if position.shares else None)
-            market_value_for_position = position.market_value or (position.shares * market_price if market_price is not None else None)
-            gain_loss = position.gain_loss if position.gain_loss is not None else (market_value_for_position - position.invested if market_value_for_position is not None else None)
+            market_price = position.market_price
+            market_value_for_position = position.market_value
+            gain_loss = position.gain_loss
             positions.append(PositionReport(
                 symbol=position.symbol,
                 name=asset.name if asset else position.name,
