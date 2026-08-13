@@ -120,11 +120,7 @@ class HistoryEngine:
             snapshot_date = snapshot.datetime.date()
             if previous_snapshot_date is None:
                 period_flow = sum(
-                    (
-                        flow.signed_amount
-                        for flow in flows
-                        if flow.datetime.date() <= snapshot_date
-                    ),
+                    (flow.signed_amount for flow in flows if flow.datetime.date() <= snapshot_date),
                     Decimal("0"),
                 )
                 initial_period_flow = period_flow
@@ -146,11 +142,11 @@ class HistoryEngine:
                 post_initial_flow = cumulative_flow - initial_period_flow
                 performance = snapshot.total_value - initial_value - post_initial_flow
 
-                if previous_value != 0:
-                    period_end_ex_flow = snapshot.total_value - period_flow
-                    with localcontext() as context:
-                        context.prec = 40
-                        cumulative_twr_factor *= period_end_ex_flow / previous_value
+                with localcontext() as context:
+                    context.prec = 40
+                    period_start_value = previous_value + period_flow
+                    if period_start_value != 0:
+                        cumulative_twr_factor *= snapshot.total_value / period_start_value
 
             performance_percent = (
                 performance / initial_value * Decimal("100") if initial_value != 0 else Decimal("0")
