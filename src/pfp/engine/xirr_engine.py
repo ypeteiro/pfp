@@ -19,7 +19,6 @@ class XirrEngine:
             for flow in flows
         ]
         cash_flows.append((final_datetime, final_value))
-
         cash_flows = sorted(cash_flows, key=lambda item: item[0])
         if not _has_sign_change(cash_flows):
             return None
@@ -41,39 +40,43 @@ def _has_sign_change(cash_flows):
     return has_positive and has_negative
 
 
-def _npv(rate, cash_flows):
+def _npv_log_rate(log_rate, cash_flows):
     first_datetime = cash_flows[0][0]
     total = Decimal("0")
-    one = Decimal("1")
     for timestamp, amount in cash_flows:
         years = Decimal((timestamp - first_datetime).total_seconds()) / Decimal("31536000")
-        total += amount / (one + rate) ** years
+        total += amount * (-years * log_rate).exp()
     return total
 
 
 def _solve_xirr(cash_flows):
-    low = Decimal("-0.9999999999")
-    high = Decimal("10")
-    low_npv = _npv(low, cash_flows)
-    high_npv = _npv(high, cash_flows)
+    """Solve in log(1 + rate) space so very short periods remain numerically stable."""
+    low = Decimal("-20")
+    high = Decimal("20")
+    low_npv = _npv_log_rate(low, cash_flows)
+    high_npv = _npv_log_rate(high, cash_flows)
 
     for _ in range(200):
         if low_npv == 0:
-            return low
+            return low.exp() - Decimal("1")
         if high_npv == 0:
-            return high
+            return high.exp() - Decimal("1")
         if low_npv * high_npv < 0:
             break
-        high *= Decimal("2")
-        high_npv = _npv(high, cash_flows)
+        if low_npv > 0 and high_npv > 0:
+            high *= Decimal("2")
+            high_npv = _npv_log_rate(high, cash_flows)
+        else:
+            low *= Decimal("2")
+            low_npv = _npv_log_rate(low, cash_flows)
     else:
         return None
 
-    for _ in range(200):
+    for _ in range(300):
         mid = (low + high) / Decimal("2")
-        mid_npv = _npv(mid, cash_flows)
+        mid_npv = _npv_log_rate(mid, cash_flows)
         if abs(mid_npv) < Decimal("1E-35"):
-            return mid
+            return mid.exp() - Decimal("1")
         if low_npv * mid_npv <= 0:
             high = mid
             high_npv = mid_npv
@@ -81,4 +84,4 @@ def _solve_xirr(cash_flows):
             low = mid
             low_npv = mid_npv
 
-    return (low + high) / Decimal("2")
+    return ((low + high) / Decimal("2")).exp() - Decimal("1")
