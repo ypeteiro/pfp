@@ -1,4 +1,3 @@
-from dataclasses import replace
 from datetime import datetime, timezone
 from decimal import Decimal
 
@@ -74,8 +73,8 @@ def test_history_reports_multi_period_twr_and_xirr(tmp_path, monkeypatch, capsys
     snapshots_file = tmp_path / "snapshots.csv"
     movements_file = tmp_path / "movements.csv"
     repository = SnapshotRepository(snapshots_file)
-    first = replace(_snapshot(10, "10000"), datetime=datetime(2025, 8, 10, tzinfo=timezone.utc))
-    second = replace(_snapshot(11, "10500"), datetime=datetime(2026, 8, 11, tzinfo=timezone.utc))
+    first = _snapshot(10, "10000")
+    second = _snapshot(11, "10500")
     repository.save(first)
     repository.save(second)
 
@@ -84,7 +83,7 @@ def test_history_reports_multi_period_twr_and_xirr(tmp_path, monkeypatch, capsys
         "pfp.history_cli.TradeRepublicImporter.load_capital_flows",
         lambda self, path: [
             CapitalFlow(
-                datetime=datetime(2026, 8, 10, 12, tzinfo=timezone.utc),
+                datetime=datetime(2026, 8, 10, tzinfo=timezone.utc),
                 amount=Decimal("500"),
                 flow_type=FlowType.CONTRIBUTION,
             )
