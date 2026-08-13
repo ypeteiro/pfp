@@ -81,7 +81,7 @@ def test_history_reports_multi_period_twr_and_xirr(tmp_path, monkeypatch, capsys
         "pfp.history_cli.TradeRepublicImporter.load_capital_flows",
         lambda self, path: [
             CapitalFlow(
-                datetime=datetime(2026, 8, 11, 12, tzinfo=timezone.utc),
+                datetime=datetime(2026, 8, 10, 12, tzinfo=timezone.utc),
                 amount=Decimal("500"),
                 flow_type=FlowType.CONTRIBUTION,
             )
