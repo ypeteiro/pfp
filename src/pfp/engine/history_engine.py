@@ -117,9 +117,9 @@ class HistoryEngine:
                 performance = snapshot.total_value - initial_value - cumulative_flow
                 with localcontext() as context:
                     context.prec = 40
-                    period_start_value = previous_value + period_flow
-                    if period_start_value:
-                        cumulative_twr_factor *= snapshot.total_value / period_start_value
+                    if previous_value:
+                        period_factor = (snapshot.total_value - period_flow) / previous_value
+                        cumulative_twr_factor *= period_factor
                 twr = cumulative_twr_factor - Decimal("1")
 
             performance_percent = performance / initial_value * Decimal("100") if initial_value else Decimal("0")
