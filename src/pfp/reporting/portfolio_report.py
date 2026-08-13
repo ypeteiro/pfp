@@ -73,16 +73,25 @@ class PortfolioReport:
             Decimal("0"),
         )
 
+        class_map = {
+            "RV": "RV",
+            "EQUITY": "RV",
+            "RF": "RF",
+            "FIXED_INCOME": "RF",
+            "GOLD": "GOLD",
+            "CRYPTO": "CRYPTO",
+        }
         class_values = {"RV": Decimal("0"), "RF": Decimal("0"), "GOLD": Decimal("0"), "CRYPTO": Decimal("0")}
         for position in portfolio.positions.values():
-            if position.market_value is not None and position.portfolio_class in class_values:
-                class_values[position.portfolio_class] += position.market_value
+            normalized_class = class_map.get(position.portfolio_class)
+            if position.market_value is not None and normalized_class is not None:
+                class_values[normalized_class] += position.market_value
 
         positions = tuple(
             PositionReport(
                 symbol=position.symbol,
                 name=position.name,
-                portfolio_class=position.portfolio_class,
+                portfolio_class=class_map.get(position.portfolio_class, position.portfolio_class),
                 shares=position.shares,
                 invested=position.invested,
                 average_price=(
