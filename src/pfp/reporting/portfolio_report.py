@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 
+from pfp.domain.asset_catalog import AssetCatalog
 from pfp.domain.portfolio import Portfolio
 
 
@@ -17,6 +18,8 @@ class PositionReport:
     market_value: Decimal | None
     weight: Decimal | None
     gain_loss: Decimal | None
+    isin: str | None = None
+    ticker: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,74 +67,38 @@ class PortfolioReport:
 
     @classmethod
     def from_portfolio(cls, portfolio: Portfolio) -> "PortfolioReport":
-        market_value = sum(
-            (position.market_value or Decimal("0") for position in portfolio.positions.values()),
-            Decimal("0"),
-        )
-        unrealized_gain_loss = sum(
-            (position.gain_loss or Decimal("0") for position in portfolio.positions.values()),
-            Decimal("0"),
-        )
-
-        class_map = {
-            "RV": "RV",
-            "EQUITY": "RV",
-            "RF": "RF",
-            "FIXED_INCOME": "RF",
-            "GOLD": "GOLD",
-            "CRYPTO": "CRYPTO",
-        }
+        market_value = sum((position.market_value or Decimal("0") for position in portfolio.positions.values()), Decimal("0"))
+        unrealized_gain_loss = sum((position.gain_loss or Decimal("0") for position in portfolio.positions.values()), Decimal("0"))
+        class_map = {"RV": "RV", "EQUITY": "RV", "RF": "RF", "FIXED_INCOME": "RF", "GOLD": "GOLD", "CRYPTO": "CRYPTO"}
         class_values = {"RV": Decimal("0"), "RF": Decimal("0"), "GOLD": Decimal("0"), "CRYPTO": Decimal("0")}
         for position in portfolio.positions.values():
             normalized_class = class_map.get(position.portfolio_class)
             if position.market_value is not None and normalized_class is not None:
                 class_values[normalized_class] += position.market_value
 
-        positions = tuple(
-            PositionReport(
+        positions = []
+        for position in sorted(portfolio.positions.values(), key=lambda item: item.symbol):
+            asset = AssetCatalog.get(position.symbol)
+            market_price = position.market_price or (position.invested / position.shares if position.shares else None)
+            market_value_for_position = position.market_value or (position.shares * market_price if market_price is not None else None)
+            gain_loss = position.gain_loss if position.gain_loss is not None else (market_value_for_position - position.invested if market_value_for_position is not None else None)
+            positions.append(PositionReport(
                 symbol=position.symbol,
-                name=position.name,
+                name=asset.name if asset else position.name,
                 portfolio_class=class_map.get(position.portfolio_class, position.portfolio_class),
                 shares=position.shares,
                 invested=position.invested,
-                average_price=(
-                    position.average_price
-                    if position.average_price
-                    else (position.invested / position.shares if position.shares else Decimal("0"))
-                ),
-                market_price=position.market_price,
-                market_value=position.market_value,
-                weight=(position.market_value / market_value if market_value else None),
-                gain_loss=position.gain_loss,
-            )
-            for position in sorted(portfolio.positions.values(), key=lambda item: item.symbol)
-        )
+                average_price=position.average_price or (position.invested / position.shares if position.shares else Decimal("0")),
+                market_price=market_price,
+                market_value=market_value_for_position,
+                weight=(market_value_for_position / market_value if market_value else None),
+                gain_loss=gain_loss,
+                isin=asset.isin if asset else (position.symbol if position.symbol.upper().startswith("IE") else None),
+                ticker=asset.ticker if asset else (position.symbol if not position.symbol.upper().startswith("IE") else None),
+            ))
 
-        accounts = tuple(
-            AccountReport(account.name, account.broker, account.currency, account.balance)
-            for account in sorted(portfolio.accounts, key=lambda item: (item.broker, item.name))
-        )
-
-        movements = tuple(
-            MovementReport(
-                datetime=movement.datetime,
-                broker=movement.broker,
-                category=movement.category,
-                type=movement.type,
-                asset_class=movement.asset_class,
-                symbol=movement.symbol,
-                name=movement.name,
-                shares=movement.shares,
-                price=movement.price,
-                amount=movement.amount,
-                fee=movement.fee,
-                tax=movement.tax,
-                currency=movement.currency,
-                description=movement.description,
-                transaction_id=movement.transaction_id,
-            )
-            for movement in sorted(portfolio.movements, key=lambda item: item.datetime)
-        )
+        accounts = tuple(AccountReport(a.name, a.broker, a.currency, a.balance) for a in sorted(portfolio.accounts, key=lambda item: (item.broker, item.name)))
+        movements = tuple(MovementReport(m.datetime, m.broker, m.category, m.type, m.asset_class, m.symbol, m.name, m.shares, m.price, m.amount, m.fee, m.tax, m.currency, m.description, m.transaction_id) for m in sorted(portfolio.movements, key=lambda item: item.datetime))
 
         return cls(
             cash=portfolio.cash,
@@ -144,7 +111,7 @@ class PortfolioReport:
             fixed_income_value=class_values["RF"],
             gold_value=class_values["GOLD"],
             crypto_value=class_values["CRYPTO"],
-            positions=positions,
+            positions=tuple(positions),
             accounts=accounts,
             movements=movements,
         )
