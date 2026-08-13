@@ -21,15 +21,19 @@ def _report():
     return PortfolioReport.from_portfolio(portfolio)
 
 
-def test_workbook_writer_creates_summary_and_positions(tmp_path):
+def test_workbook_writer_creates_full_workbook(tmp_path):
     output = tmp_path / "portfolio.xlsx"
     WorkbookWriter().write(_report(), output)
     workbook = load_workbook(output, data_only=False)
-    assert workbook.sheetnames == ["Resumen", "Posiciones"]
+    assert workbook.sheetnames == ["Dashboard", "Resumen", "Posiciones", "Cuentas", "Movimientos", "Asignación"]
     assert workbook["Resumen"]["A4"].value == "Patrimonio total"
     assert workbook["Resumen"]["B4"].value == Decimal("1240")
     assert workbook["Posiciones"]["A2"].value == "EUNL"
     assert workbook["Posiciones"]["D2"].value == Decimal("2")
+    assert workbook["Posiciones"]["F2"].value == Decimal("100")
+    assert workbook["Posiciones"]["H2"].value == Decimal("240")
+    assert workbook["Asignación"]["A2"].value == "RV"
+    assert workbook["Asignación"]["B2"].value == Decimal("0.75")
 
 
 def test_workbook_writer_creates_parent_directory(tmp_path):
