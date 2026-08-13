@@ -1,6 +1,7 @@
 import argparse
 import io
 from contextlib import redirect_stdout
+from pathlib import Path
 
 from pfp.cli import run_snapshot
 from pfp.engine.history_engine import HistoryEngine
@@ -39,7 +40,7 @@ def run_history(
 
     snapshots = SnapshotRepository(snapshots_file).load()
     capital_flows = []
-    if movements_file is not None:
+    if movements_file is not None and Path(movements_file).exists():
         capital_flows = TradeRepublicImporter().load_capital_flows(movements_file)
 
     history = HistoryEngine().build(snapshots, capital_flows)
