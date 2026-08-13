@@ -1,3 +1,4 @@
+from datetime import datetime, time
 from pathlib import Path
 from decimal import Decimal
 
@@ -30,6 +31,12 @@ class WorkbookWriter:
         self._write_allocation(workbook, report)
         workbook.save(output)
         return output
+
+    @staticmethod
+    def _excel_value(value):
+        if isinstance(value, (datetime, time)) and value.tzinfo is not None:
+            return value.replace(tzinfo=None)
+        return value
 
     @staticmethod
     def _write_dashboard(sheet, report: PortfolioReport) -> None:
@@ -85,7 +92,16 @@ class WorkbookWriter:
         sheet = workbook.create_sheet("Posiciones")
         WorkbookWriter._header(sheet, ["Símbolo", "Nombre", "Clase", "Participaciones", "Invertido", "Precio medio", "Precio mercado", "Valor mercado", "Peso", "P/L"])
         for p in report.positions:
-            sheet.append([p.symbol, p.name, p.portfolio_class, p.shares, p.invested, p.average_price, p.market_price, p.market_value, p.weight, p.gain_loss])
+            market_price = p.market_price
+            if market_price is None and p.shares:
+                market_price = p.invested / p.shares
+            market_value = p.market_value
+            if market_value is None and market_price is not None:
+                market_value = p.shares * market_price
+            gain_loss = p.gain_loss
+            if gain_loss is None and market_value is not None:
+                gain_loss = market_value - p.invested
+            sheet.append([p.symbol, p.name, p.portfolio_class, p.shares, p.invested, p.average_price, market_price, market_value, p.weight, gain_loss])
         for row in sheet.iter_rows(min_row=2, max_row=sheet.max_row):
             row[3].number_format = SHARES
             for index in (4, 5, 6, 7, 9): row[index].number_format = EURO
@@ -96,7 +112,8 @@ class WorkbookWriter:
     def _write_accounts(workbook: Workbook, report: PortfolioReport) -> None:
         sheet = workbook.create_sheet("Cuentas")
         WorkbookWriter._header(sheet, ["Cuenta", "Banco/Broker", "Moneda", "Saldo"])
-        for a in report.accounts: sheet.append([a.name, a.broker, a.currency, a.balance])
+        for a in report.accounts:
+            sheet.append([a.name, a.broker, a.currency, a.balance])
         for row in sheet.iter_rows(min_row=2, max_row=sheet.max_row, min_col=4, max_col=4): row[0].number_format = EURO
         WorkbookWriter._autosize(sheet)
 
@@ -105,7 +122,7 @@ class WorkbookWriter:
         sheet = workbook.create_sheet("Movimientos")
         WorkbookWriter._header(sheet, ["Fecha", "Broker", "Categoría", "Tipo", "Clase", "Símbolo", "Nombre", "Participaciones", "Precio", "Importe", "Comisión", "Impuestos", "Moneda", "Descripción", "Transaction ID"])
         for m in report.movements:
-            sheet.append([m.datetime, m.broker, m.category, m.type, m.asset_class, m.symbol, m.name, m.shares, m.price, m.amount, m.fee, m.tax, m.currency, m.description, m.transaction_id])
+            sheet.append([WorkbookWriter._excel_value(m.datetime), m.broker, m.category, m.type, m.asset_class, m.symbol, m.name, m.shares, m.price, m.amount, m.fee, m.tax, m.currency, m.description, m.transaction_id])
         for row in sheet.iter_rows(min_row=2, max_row=sheet.max_row):
             row[0].number_format = 'yyyy-mm-dd hh:mm'
             row[7].number_format = SHARES
