@@ -43,7 +43,7 @@ class WorkbookWriter:
         sheet["A3"].font = Font(bold=True)
         for row in sheet.iter_rows(min_row=4, max_row=sheet.max_row, min_col=2, max_col=2):
             row[0].number_format = '#,##0.00 [$€-es-ES]'
-        self._autosize(sheet)
+        WorkbookWriter._autosize(sheet)
 
     @staticmethod
     def _write_positions(workbook: Workbook, report: PortfolioReport) -> None:
