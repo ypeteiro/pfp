@@ -135,7 +135,13 @@ class HistoryEngine:
                     time_weighted_return=twr,
                 )
             )
-            previous_value = snapshot.total_value
+
+            if previous_value is None:
+                # Capital already present on the first snapshot date is part of
+                # the starting capital, not a return-producing period flow.
+                previous_value = snapshot.total_value + period_flow
+            else:
+                previous_value = snapshot.total_value
             previous_snapshot_datetime = snapshot.datetime
 
         xirr = self.xirr_engine.calculate(flows, ordered[-1].total_value, ordered[-1].datetime)
