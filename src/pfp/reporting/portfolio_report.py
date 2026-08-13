@@ -59,8 +59,8 @@ class PortfolioReport:
     gold_value: Decimal
     crypto_value: Decimal
     positions: tuple[PositionReport, ...]
-    accounts: tuple[AccountReport, ...]
-    movements: tuple[MovementReport, ...]
+    accounts: tuple[AccountReport, ...] = ()
+    movements: tuple[MovementReport, ...] = ()
 
     @classmethod
     def from_portfolio(cls, portfolio: Portfolio) -> "PortfolioReport":
@@ -85,7 +85,11 @@ class PortfolioReport:
                 portfolio_class=position.portfolio_class,
                 shares=position.shares,
                 invested=position.invested,
-                average_price=position.average_price,
+                average_price=(
+                    position.average_price
+                    if position.average_price
+                    else (position.invested / position.shares if position.shares else Decimal("0"))
+                ),
                 market_price=position.market_price,
                 market_value=position.market_value,
                 weight=(position.market_value / market_value if market_value else None),
