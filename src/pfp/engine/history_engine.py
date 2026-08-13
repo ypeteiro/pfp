@@ -101,7 +101,7 @@ class HistoryEngine:
         initial_value = ordered[0].total_value
         previous_value = None
         cumulative_flow = Decimal("0")
-        previous_snapshot_date = None
+        previous_snapshot_datetime = None
         initial_period_flow = Decimal("0")
         cumulative_twr_factor = Decimal("1")
 
@@ -117,10 +117,13 @@ class HistoryEngine:
                     else Decimal("0")
                 )
 
-            snapshot_date = snapshot.datetime.date()
-            if previous_snapshot_date is None:
+            if previous_snapshot_datetime is None:
                 period_flow = sum(
-                    (flow.signed_amount for flow in flows if flow.datetime.date() <= snapshot_date),
+                    (
+                        flow.signed_amount
+                        for flow in flows
+                        if flow.datetime <= snapshot.datetime
+                    ),
                     Decimal("0"),
                 )
                 initial_period_flow = period_flow
@@ -129,14 +132,14 @@ class HistoryEngine:
                     (
                         flow.signed_amount
                         for flow in flows
-                        if previous_snapshot_date < flow.datetime.date() <= snapshot_date
+                        if previous_snapshot_datetime < flow.datetime <= snapshot.datetime
                     ),
                     Decimal("0"),
                 )
 
             cumulative_flow += period_flow
 
-            if previous_snapshot_date is None:
+            if previous_snapshot_datetime is None:
                 performance = snapshot.total_value - cumulative_flow
             else:
                 post_initial_flow = cumulative_flow - initial_period_flow
@@ -153,7 +156,7 @@ class HistoryEngine:
             )
 
             time_weighted_return = (
-                None if previous_snapshot_date is None else cumulative_twr_factor - Decimal("1")
+                None if previous_snapshot_datetime is None else cumulative_twr_factor - Decimal("1")
             )
 
             points.append(
@@ -169,7 +172,7 @@ class HistoryEngine:
                 )
             )
             previous_value = snapshot.total_value
-            previous_snapshot_date = snapshot_date
+            previous_snapshot_datetime = snapshot.datetime
 
         xirr = self.xirr_engine.calculate(flows, ordered[-1].total_value, ordered[-1].datetime)
         return History(points=tuple(points), xirr=xirr)
