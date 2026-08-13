@@ -26,6 +26,7 @@ class WorkbookWriter:
         sheet.append(["PFP — Resumen de cartera"])
         sheet["A1"].font = Font(bold=True, size=16)
         sheet.append([])
+        sheet.append([])
         rows = [
             ("Patrimonio total", report.total_value),
             ("Efectivo", report.cash),
@@ -40,8 +41,7 @@ class WorkbookWriter:
         ]
         for label, value in rows:
             sheet.append([label, value])
-        sheet["A3"].font = Font(bold=True)
-        for row in sheet.iter_rows(min_row=4, max_row=sheet.max_row, min_col=2, max_col=2):
+        for row in sheet.iter_rows(min_row=5, max_row=sheet.max_row, min_col=2, max_col=2):
             row[0].number_format = '#,##0.00 [$€-es-ES]'
         WorkbookWriter._autosize(sheet)
 
