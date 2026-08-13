@@ -12,9 +12,16 @@ class Position:
     portfolio_class: str | None = None
     market_price: Decimal | None = None
 
+    def __post_init__(self) -> None:
+        if self.shares < 0:
+            raise ValueError("Shares cannot be negative")
+        if self.invested < 0:
+            raise ValueError("Invested amount cannot be negative")
+        if self.average_price < 0:
+            raise ValueError("Average price cannot be negative")
+
     @property
     def market_value(self) -> Decimal | None:
-
         if self.market_price is None:
             return None
 
@@ -22,7 +29,6 @@ class Position:
 
     @property
     def gain_loss(self) -> Decimal | None:
-
         market_value = self.market_value
 
         if market_value is None:
