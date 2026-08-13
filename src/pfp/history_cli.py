@@ -40,8 +40,11 @@ def run_history(
 
     snapshots = SnapshotRepository(snapshots_file).load()
     capital_flows = []
-    if movements_file is not None and Path(movements_file).exists():
-        capital_flows = TradeRepublicImporter().load_capital_flows(movements_file)
+    if movements_file is not None:
+        try:
+            capital_flows = TradeRepublicImporter().load_capital_flows(movements_file)
+        except FileNotFoundError:
+            capital_flows = []
 
     history = HistoryEngine().build(snapshots, capital_flows)
 
