@@ -6,6 +6,8 @@ class Asset:
     symbol: str
     name: str
     portfolio_class: str
+    isin: str | None = None
+    ticker: str | None = None
 
     def __post_init__(self) -> None:
         if not self.symbol.strip():
