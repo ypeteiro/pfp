@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import datetime, timezone
 from decimal import Decimal
 
@@ -73,8 +74,10 @@ def test_history_reports_multi_period_twr_and_xirr(tmp_path, monkeypatch, capsys
     snapshots_file = tmp_path / "snapshots.csv"
     movements_file = tmp_path / "movements.csv"
     repository = SnapshotRepository(snapshots_file)
-    repository.save(_snapshot(10, "10000"))
-    repository.save(_snapshot(11, "10500"))
+    first = replace(_snapshot(10, "10000"), datetime=datetime(2025, 8, 10, tzinfo=timezone.utc))
+    second = replace(_snapshot(11, "10500"), datetime=datetime(2026, 8, 11, tzinfo=timezone.utc))
+    repository.save(first)
+    repository.save(second)
 
     monkeypatch.setattr("pfp.history_cli._capture_current_snapshot", lambda *args: None)
     monkeypatch.setattr(
