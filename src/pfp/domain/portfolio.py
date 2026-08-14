@@ -31,6 +31,7 @@ class Portfolio:
         if self.invested < 0:
             raise ValueError("Invested amount cannot be negative")
 
+        position_cost_basis = Decimal("0")
         for symbol, position in self.positions.items():
             if symbol != position.symbol:
                 raise ValueError("Position key must match position symbol")
@@ -40,6 +41,10 @@ class Portfolio:
                 raise ValueError("Position invested amount cannot be negative")
             if position.average_price < 0:
                 raise ValueError("Position average price cannot be negative")
+            position_cost_basis += position.invested
+
+        if self.invested != position_cost_basis:
+            raise ValueError("Portfolio invested amount must equal position cost basis")
 
     @property
     def market_value(self) -> Decimal | None:
