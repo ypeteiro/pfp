@@ -1,6 +1,6 @@
 """Presentation helpers for the positions view."""
 
-from datetime import date
+from datetime import datetime
 from decimal import Decimal
 from html import escape
 
@@ -25,7 +25,7 @@ def positions_html(report: PortfolioReport, sort: str = "weight", direction: str
         tone = "positive" if gain is not None and gain > 0 else "negative" if gain is not None and gain < 0 else ""
         price = euro(p.market_price)
         if p.market_price is not None:
-            price += price_tooltip(p.symbol)
+            price += price_tooltip(p.symbol, report.price_consulted_at)
         rows.append(
             f'<tr><td><strong>{escape(p.ticker or p.symbol or p.isin)}</strong><small>{escape(p.isin or "")}</small></td>'
             f'<td>{escape(p.name)}</td><td>{escape(p.portfolio_class or "—")}</td><td>{p.shares}</td>'
@@ -47,14 +47,15 @@ def positions_html(report: PortfolioReport, sort: str = "weight", direction: str
     return '<h1>Posiciones</h1><p class="muted">Detalle de cada activo. Haz clic en cualquier columna para ordenar.</p><section class="panel positions-panel"><div class="table-scroll"><table><thead><tr>' + headers + '</tr></thead><tbody>' + ''.join(rows or [empty]) + '</tbody></table></div></section>'
 
 
-def price_tooltip(symbol: str) -> str:
+def price_tooltip(symbol: str, consulted_at: datetime | None = None) -> str:
     if symbol in VANGUARD_SYMBOLS:
         source = "Vanguard"
     elif symbol in YAHOO_SYMBOLS:
         source = "Yahoo Finance"
     else:
         source = "Proveedor de precios"
-    consulted = date.today().strftime("%d/%m/%Y")
+    consulted_at = consulted_at or datetime.now().astimezone()
+    consulted = consulted_at.strftime("%d/%m/%Y %H:%M")
     text = f"Fuente: {source}. Fecha de consulta: {consulted}. Último precio disponible obtenido por PFP."
     return f'<span class="tooltip price-tooltip" tabindex="0" aria-label="Información del precio">ⓘ<span class="tooltip-content">{escape(text)}</span></span>'
 
