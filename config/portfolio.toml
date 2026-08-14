@@ -1,0 +1,8 @@
+[equity]
+target = 0.75
+
+[fixed_income]
+target = 0.20
+
+[gold]
+target = 0.05
