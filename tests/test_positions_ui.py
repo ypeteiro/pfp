@@ -9,7 +9,20 @@ def test_positions_view_shows_financial_details():
         cash=Decimal("100"), invested=Decimal("1000"), market_value=Decimal("1200"), total_value=Decimal("1300"),
         realized_gain_loss=Decimal("0"), unrealized_gain_loss=Decimal("200"),
         equity_value=Decimal("1200"), fixed_income_value=Decimal("0"), gold_value=Decimal("0"), crypto_value=Decimal("0"),
-        positions=(PositionReport("EUNL", "MSCI World", "RV", Decimal("2"), Decimal("1000"), Decimal("600"), Decimal("1200"), Decimal("0.8"), Decimal("200"), None, "IE00B4L5Y983", "EUNL"),),
+        positions=(PositionReport(
+            symbol="EUNL",
+            name="MSCI World",
+            portfolio_class="RV",
+            shares=Decimal("2"),
+            invested=Decimal("1000"),
+            average_price=Decimal("500"),
+            market_price=Decimal("600"),
+            market_value=Decimal("1200"),
+            weight=Decimal("0.8"),
+            gain_loss=Decimal("200"),
+            isin="IE00B4L5Y983",
+            ticker="EUNL",
+        ),),
         accounts=(), movements=(),
     )
     html = positions_html(report)
