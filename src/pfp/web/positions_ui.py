@@ -14,6 +14,7 @@ def positions_html(report: PortfolioReport) -> str:
         value = p.market_value
         weight = p.weight if p.weight is not None else (value / total if value is not None and total else None)
         gain = p.gain_loss
+        # gain_loss is an absolute amount; divide by invested capital to obtain P/L %.
         gain_pct = (gain / p.invested) if gain is not None and p.invested else None
         tone = "positive" if gain is not None and gain > 0 else "negative" if gain is not None and gain < 0 else ""
         rows.append(
