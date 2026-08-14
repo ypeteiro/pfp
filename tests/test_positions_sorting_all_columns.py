@@ -34,12 +34,12 @@ def test_positions_can_sort_by_every_column():
     }
     for field, symbols in expected.items():
         html = positions_html(r, field, "asc")
-        order = [html.index(f">{symbol}<") for symbol in symbols]
+        order = [html.index(f'<strong>{symbol}</strong>') for symbol in symbols]
         assert order == sorted(order), field
         assert f'href="/positions?sort={field}&direction=desc"' in html
 
 
 def test_positions_sorting_is_available_from_webapp_route():
     html = WebApp(report()).render("/positions?sort=price&direction=asc")
-    assert html.index(">GOLD<") < html.index(">EUNL<") < html.index(">VWCE<")
+    assert html.index("<strong>GOLD</strong>") < html.index("<strong>EUNL</strong>") < html.index("<strong>VWCE</strong>")
     assert 'href="/positions?sort=price&direction=desc"' in html
