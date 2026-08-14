@@ -12,7 +12,7 @@ def test_allocation_actions_classifies_deviation():
     assert rows[0].current_weight == Decimal("0.7")
     assert rows[0].action == "Aumentar"
     assert rows[1].action == "Mantener"
-    assert rows[2].action == "Mantener"
+    assert rows[2].action == "Reducir"
 
 
 def test_allocation_actions_handles_zero_total():
