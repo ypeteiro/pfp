@@ -53,13 +53,27 @@ def serve(
     sales_file: Path | None = None,
     price_provider=None,
 ) -> None:
-    report = build_web_report(movements_file, investments_file, sales_file, price_provider)
-    app = WebApp(report)
+    def make_app() -> WebApp:
+        return WebApp(build_web_report(movements_file, investments_file, sales_file, price_provider))
+
+    app = make_app()
 
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):  # noqa: N802
-            # Keep the query string: WebApp uses it to apply sorting.
+            nonlocal app
             path = self.path
+            if path == "/refresh":
+                try:
+                    app = make_app()
+                except Exception as exc:  # pragma: no cover - exercised through a live server
+                    self.send_error(500, f"No se han podido actualizar los datos: {exc}")
+                    return
+                self.send_response(303)
+                self.send_header("Location", "/")
+                self.end_headers()
+                return
+
+            # Keep the query string: WebApp uses it to apply sorting.
             try:
                 body = app.render(path).encode("utf-8")
             except KeyError:
