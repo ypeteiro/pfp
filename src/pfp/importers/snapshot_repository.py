@@ -47,6 +47,9 @@ class SnapshotRepository:
                 for row in reader
             ]
 
+    def has_snapshot_on(self, target_date):
+        return any(snapshot.datetime.date() == target_date for snapshot in self.load())
+
     def save(self, snapshot):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.path.open("a", encoding="utf-8", newline="") as file:
