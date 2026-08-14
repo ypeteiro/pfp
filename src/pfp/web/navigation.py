@@ -15,7 +15,6 @@ NAVIGATION = (
     NavigationItem("Posiciones", "/positions"),
     NavigationItem("Movimientos", "/movements"),
     NavigationItem("Asignación", "/allocation"),
-    NavigationItem("Ayuda / README", "https://github.com/ypeteiro/pfp#readme", external=True),
 )
 
 
