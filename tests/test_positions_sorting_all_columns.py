@@ -11,9 +11,24 @@ def report():
         realized_gain_loss=Decimal("10"), unrealized_gain_loss=Decimal("300"),
         equity_value=Decimal("2700"), fixed_income_value=Decimal("300"), gold_value=Decimal("300"), crypto_value=Decimal("0"),
         positions=(
-            PositionReport("VWCE", "Vanguard FTSE All-World", "RV", Decimal("3"), Decimal("2000"), Decimal("666.67"), Decimal("800"), Decimal("0.80"), Decimal("200"), None, "IE00BK5BQT80", "VWCE"),
-            PositionReport("EUNL", "MSCI World", "RV", Decimal("1"), Decimal("500"), Decimal("500"), Decimal("600"), Decimal("0.60"), Decimal("100"), None, "IE00B4L5Y983", "EUNL"),
-            PositionReport("GOLD", "Gold", "ORO", Decimal("2"), Decimal("500"), Decimal("250"), Decimal("1000"), Decimal("1.00"), Decimal("0"), None, "IE00B4ND3602", "GOLD"),
+            PositionReport(
+                symbol="VWCE", name="Vanguard FTSE All-World", portfolio_class="RV",
+                shares=Decimal("3"), invested=Decimal("2000"), average_price=Decimal("666.67"),
+                market_price=Decimal("666.67"), market_value=Decimal("2000"), weight=Decimal("0.80"),
+                gain_loss=Decimal("200"), isin="IE00BK5BQT80", ticker="VWCE",
+            ),
+            PositionReport(
+                symbol="EUNL", name="MSCI World", portfolio_class="RV",
+                shares=Decimal("1"), invested=Decimal("500"), average_price=Decimal("500"),
+                market_price=Decimal("500"), market_value=Decimal("500"), weight=Decimal("0.60"),
+                gain_loss=Decimal("100"), isin="IE00B4L5Y983", ticker="EUNL",
+            ),
+            PositionReport(
+                symbol="GOLD", name="Gold", portfolio_class="GOLD",
+                shares=Decimal("2"), invested=Decimal("500"), average_price=Decimal("250"),
+                market_price=Decimal("250"), market_value=Decimal("500"), weight=Decimal("1.00"),
+                gain_loss=Decimal("0"), isin="IE00B4ND3602", ticker="GOLD",
+            ),
         ),
         accounts=(), movements=(),
     )
@@ -24,12 +39,12 @@ def test_positions_can_sort_by_every_column():
     expected = {
         "symbol": ("EUNL", "GOLD", "VWCE"),
         "name": ("Gold", "MSCI World", "Vanguard FTSE All-World"),
-        "class": ("Gold", "MSCI World", "Vanguard FTSE All-World"),
+        "class": ("GOLD", "RV", "RV"),
         "shares": ("EUNL", "GOLD", "VWCE"),
-        "invested": ("GOLD", "EUNL", "VWCE"),
+        "invested": ("EUNL", "GOLD", "VWCE"),
         "price": ("GOLD", "EUNL", "VWCE"),
-        "value": ("EUNL", "VWCE", "GOLD"),
-        "weight": ("EUNL", "VWCE", "GOLD"),
+        "value": ("EUNL", "GOLD", "VWCE"),
+        "weight": ("EUNL", "GOLD", "VWCE"),
         "gain": ("GOLD", "EUNL", "VWCE"),
     }
     for field, symbols in expected.items():
