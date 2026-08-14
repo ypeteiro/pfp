@@ -7,6 +7,7 @@ import pandas as pd
 from pfp.domain.capital_flow import CapitalFlow, FlowType
 from pfp.domain.movement import Movement
 from pfp.importers.base import Importer
+from pfp.importers.validation import ImportValidationError, validate_movements
 
 
 class TradeRepublicImporter(Importer):
@@ -18,9 +19,7 @@ class TradeRepublicImporter(Importer):
         for _, row in df.iterrows():
             movements.append(
                 Movement(
-                    datetime=datetime.fromisoformat(
-                        row["datetime"].replace("Z", "+00:00")
-                    ),
+                    datetime=datetime.fromisoformat(row["datetime"].replace("Z", "+00:00")),
                     date=datetime.strptime(row["date"], "%Y-%m-%d"),
                     account_type=row["account_type"],
                     broker="Trade Republic",
@@ -47,6 +46,9 @@ class TradeRepublicImporter(Importer):
                 )
             )
 
+        issues = validate_movements(movements)
+        if issues:
+            raise ImportValidationError(issues)
         return movements
 
     def load_capital_flows(self, path: Path) -> list[CapitalFlow]:
