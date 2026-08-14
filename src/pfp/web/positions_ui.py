@@ -23,22 +23,31 @@ def positions_html(report: PortfolioReport, sort: str = "weight", direction: str
             f'<td>{pct(weight)}</td><td class="{tone}">{euro(gain)}<small>{pct(gain_pct)}</small></td></tr>'
         )
     headers = (
-        '<th>Activo</th>'
+        f'{sort_heading("Activo", "symbol", sort, direction)}'
         f'{sort_heading("Nombre", "name", sort, direction)}'
-        '<th>Clase</th><th>Participaciones</th><th>Invertido</th><th>Precio</th>'
+        f'{sort_heading("Clase", "class", sort, direction)}'
+        f'{sort_heading("Participaciones", "shares", sort, direction)}'
+        f'{sort_heading("Invertido", "invested", sort, direction)}'
+        f'{sort_heading("Precio", "price", sort, direction)}'
         f'{sort_heading("Valor", "value", sort, direction)}'
         f'{sort_heading("Peso", "weight", sort, direction)}'
-        '<th>P/L</th>'
+        f'{sort_heading("P/L", "gain", sort, direction)}'
     )
     empty = '<tr><td colspan="9">Sin posiciones</td></tr>'
-    return '<h1>Posiciones</h1><p class="muted">Detalle de cada activo. Haz clic en Nombre, Valor o Peso para ordenar.</p><section class="panel positions-panel"><div class="table-scroll"><table><thead><tr>' + headers + '</tr></thead><tbody>' + ''.join(rows or [empty]) + '</tbody></table></div></section>'
+    return '<h1>Posiciones</h1><p class="muted">Detalle de cada activo. Haz clic en cualquier columna para ordenar.</p><section class="panel positions-panel"><div class="table-scroll"><table><thead><tr>' + headers + '</tr></thead><tbody>' + ''.join(rows or [empty]) + '</tbody></table></div></section>'
 
 
 def sort_positions(report: PortfolioReport, sort: str, direction: str):
     key_map = {
+        "symbol": lambda p: (p.ticker or p.symbol or p.isin or "").lower(),
         "name": lambda p: (p.name or "").lower(),
-        "weight": lambda p: p.weight if p.weight is not None else Decimal("-1"),
+        "class": lambda p: (p.portfolio_class or "").lower(),
+        "shares": lambda p: p.shares,
+        "invested": lambda p: p.invested,
+        "price": lambda p: p.market_price if p.market_price is not None else Decimal("-1"),
         "value": lambda p: p.market_value if p.market_value is not None else Decimal("-1"),
+        "weight": lambda p: p.weight if p.weight is not None else Decimal("-1"),
+        "gain": lambda p: p.gain_loss if p.gain_loss is not None else Decimal("-1"),
     }
     key = key_map.get(sort, key_map["weight"])
     return sorted(report.positions, key=key, reverse=direction != "asc")
