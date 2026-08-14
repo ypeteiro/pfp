@@ -1,9 +1,16 @@
 """Presentation helpers for the positions view."""
 
+from datetime import date
 from decimal import Decimal
 from html import escape
 
 from pfp.reporting.portfolio_report import PortfolioReport
+
+YAHOO_SYMBOLS = {
+    "BTC", "IE00BK5BQT80", "IE00B4L5Y983", "IE00BG47KH54",
+    "IE00BKM4GZ66", "IE00B5BMR087", "IE00B4ND3602", "IE000I1Q42S9",
+}
+VANGUARD_SYMBOLS = {"IE00B03HD191"}
 
 
 def positions_html(report: PortfolioReport, sort: str = "weight", direction: str = "desc") -> str:
@@ -16,10 +23,13 @@ def positions_html(report: PortfolioReport, sort: str = "weight", direction: str
         gain = p.gain_loss
         gain_pct = (gain / p.invested) if gain is not None and p.invested else None
         tone = "positive" if gain is not None and gain > 0 else "negative" if gain is not None and gain < 0 else ""
+        price = euro(p.market_price)
+        if p.market_price is not None:
+            price += price_tooltip(p.symbol)
         rows.append(
             f'<tr><td><strong>{escape(p.ticker or p.symbol or p.isin)}</strong><small>{escape(p.isin or "")}</small></td>'
             f'<td>{escape(p.name)}</td><td>{escape(p.portfolio_class or "—")}</td><td>{p.shares}</td>'
-            f'<td>{euro(p.invested)}</td><td>{euro(p.market_price)}</td><td>{euro(value)}</td>'
+            f'<td>{euro(p.invested)}</td><td>{price}</td><td>{euro(value)}</td>'
             f'<td>{pct(weight)}</td><td class="{tone}">{euro(gain)}<small>{pct(gain_pct)}</small></td></tr>'
         )
     headers = (
@@ -35,6 +45,18 @@ def positions_html(report: PortfolioReport, sort: str = "weight", direction: str
     )
     empty = '<tr><td colspan="9">Sin posiciones</td></tr>'
     return '<h1>Posiciones</h1><p class="muted">Detalle de cada activo. Haz clic en cualquier columna para ordenar.</p><section class="panel positions-panel"><div class="table-scroll"><table><thead><tr>' + headers + '</tr></thead><tbody>' + ''.join(rows or [empty]) + '</tbody></table></div></section>'
+
+
+def price_tooltip(symbol: str) -> str:
+    if symbol in VANGUARD_SYMBOLS:
+        source = "Vanguard"
+    elif symbol in YAHOO_SYMBOLS:
+        source = "Yahoo Finance"
+    else:
+        source = "Proveedor de precios"
+    consulted = date.today().strftime("%d/%m/%Y")
+    text = f"Fuente: {source}. Fecha de consulta: {consulted}. El precio mostrado corresponde al último precio disponible obtenido por PFP."
+    return f'<span class="tooltip price-tooltip" tabindex="0" aria-label="Información del precio">ⓘ<span class="tooltip-content">{escape(text)}</span></span>'
 
 
 def sort_positions(report: PortfolioReport, sort: str, direction: str):
