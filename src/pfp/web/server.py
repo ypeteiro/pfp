@@ -56,7 +56,8 @@ def serve(
 
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):  # noqa: N802
-            path = self.path.split("?", 1)[0]
+            # Keep the query string: WebApp uses it to apply sorting.
+            path = self.path
             try:
                 body = app.render(path).encode("utf-8")
             except KeyError:
