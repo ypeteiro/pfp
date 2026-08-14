@@ -72,3 +72,19 @@ def test_time_weighted_return_compounds_multiple_periods():
 
     assert history.points[1].time_weighted_return == Decimal("0")
     assert history.points[2].time_weighted_return == Decimal("0.09523809523809523809523809524")
+
+
+def test_history_integrates_xirr():
+    history = HistoryEngine().build(
+        [_snapshot(10, "10000"), _snapshot(11, "11000")],
+        [
+            CapitalFlow(
+                datetime=datetime(2026, 8, 10, tzinfo=timezone.utc),
+                amount=Decimal("10000"),
+                flow_type=FlowType.CONTRIBUTION,
+            )
+        ],
+    )
+
+    assert history.xirr is not None
+    assert history.xirr_percent > Decimal("3000")
