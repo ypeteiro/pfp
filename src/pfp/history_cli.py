@@ -1,7 +1,7 @@
 import argparse
 import io
 from contextlib import redirect_stdout
-from pathlib import Path
+from datetime import datetime, timezone
 
 from pfp.cli import run_snapshot
 from pfp.engine.history_engine import HistoryEngine
@@ -30,7 +30,10 @@ def run_history(
     investments_file=DEFAULT_INVESTMENTS_FILE,
     sales_file=DEFAULT_SALES_FILE,
 ):
-    if movements_file is not None:
+    snapshot_repository = SnapshotRepository(snapshots_file)
+    if movements_file is not None and not snapshot_repository.has_snapshot_on(
+        datetime.now(timezone.utc).date()
+    ):
         _capture_current_snapshot(
             movements_file,
             snapshots_file,
@@ -38,7 +41,7 @@ def run_history(
             sales_file,
         )
 
-    snapshots = SnapshotRepository(snapshots_file).load()
+    snapshots = snapshot_repository.load()
     capital_flows = []
     if movements_file is not None:
         try:
