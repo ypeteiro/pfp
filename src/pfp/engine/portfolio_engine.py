@@ -59,6 +59,7 @@ class PortfolioEngine:
                 market_price = prices.get(position.symbol)
                 if market_price is not None:
                     position.market_price = market_price
+            position.validate()
         for account in portfolio.accounts:
             account.balance = portfolio.cash
         return portfolio
@@ -66,11 +67,13 @@ class PortfolioEngine:
     def apply_investment(self, portfolio, investment):
         self._apply_buy(portfolio, investment.symbol, investment.symbol, investment.shares, investment.amount, investment.portfolio_class)
         portfolio.invested = sum(position.invested for position in portfolio.positions.values())
+        portfolio.positions[investment.symbol].validate()
         return portfolio
 
     def apply_sale(self, portfolio, sale):
         self._apply_sell(portfolio, sale.symbol, sale.shares, sale.amount)
         portfolio.invested = sum(position.invested for position in portfolio.positions.values())
+        portfolio.positions[sale.symbol].validate()
         return portfolio
 
     def _apply_buy(self, portfolio, symbol, name, shares, amount, portfolio_class=None, allow_insufficient_cash=False):
@@ -92,6 +95,7 @@ class PortfolioEngine:
         portfolio.cash -= amount
         if position.shares:
             position.average_price = position.invested / position.shares
+        position.validate()
 
     def _apply_sell(self, portfolio, symbol, shares, amount):
         shares = Decimal(str(shares))
@@ -119,3 +123,4 @@ class PortfolioEngine:
             position.shares = Decimal("0")
             position.invested = Decimal("0")
             position.average_price = Decimal("0")
+        position.validate()
