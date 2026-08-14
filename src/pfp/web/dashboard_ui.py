@@ -1,6 +1,6 @@
 """Presentation helpers for the PFP dashboard v2."""
 
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from html import escape
 
@@ -42,8 +42,9 @@ def dashboard_v2_html(report: PortfolioReport, sort: str = "weight", direction: 
     position_rows = "".join(f'<tr><td>{escape(p.ticker or p.isin or p.symbol)}</td><td>{escape(p.name)}</td><td>{pct(p.weight)}</td><td>{euro(p.market_value)}</td><td>{euro(p.gain_loss)}</td></tr>' for p in positions[:10])
     total_pl = report.realized_gain_loss + report.unrealized_gain_loss
     evolution_html = _evolution_summary(_evolution_from_report(report))
-    consulted = date.today().strftime("%d/%m/%Y")
-    price_status = f'<p class="price-status">Precios de mercado consultados el {consulted} {tooltip("Los precios de las posiciones proceden de las fuentes de mercado disponibles para cada activo. Consulta el icono de información junto a cada precio para ver la fuente concreta.")}</p>'
+    consulted_at = report.price_consulted_at or datetime.now().astimezone()
+    consulted = consulted_at.strftime("%d/%m/%Y %H:%M")
+    price_status = f'<p class="price-status">Precios de mercado consultados: {consulted} {tooltip("Los precios de las posiciones proceden de las fuentes de mercado disponibles para cada activo. Consulta el icono de información junto a cada precio para ver la fuente concreta.")}</p>'
     return f"""
 <section class="dashboard-v2">
   <div class="hero"><div><p class="eyebrow">PFP · Vista general</p><h1>Tu patrimonio</h1><p class="muted">Una lectura rápida de dónde está tu dinero y cómo se desvía de tu estrategia.</p>{price_status}</div></div>
