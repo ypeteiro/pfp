@@ -6,7 +6,12 @@ import argparse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from pfp.cli import load_portfolio
+from pfp.cli import DEFAULT_INVESTMENTS_FILE, DEFAULT_SALES_FILE
+from pfp.engine.portfolio_engine import PortfolioEngine
+from pfp.importers.investment_repository import InvestmentRepository
+from pfp.importers.sale_repository import SaleRepository
+from pfp.importers.trade_republic import TradeRepublicImporter
+from pfp.market.price_provider import CompositePriceProvider
 from pfp.reporting.portfolio_report import PortfolioReport
 from pfp.web.app import WebApp
 
@@ -16,9 +21,37 @@ def dashboard_html(report: PortfolioReport) -> str:
     return WebApp(report).render("/")
 
 
-def serve(movements_file: Path, host: str = "127.0.0.1", port: int = 8000) -> None:
-    portfolio = load_portfolio(movements_file)
-    report = PortfolioReport.from_portfolio(portfolio)
+def build_web_report(
+    movements_file: Path,
+    investments_file: Path | None = None,
+    sales_file: Path | None = None,
+    price_provider=None,
+) -> PortfolioReport:
+    """Build the same valued portfolio used by the CLI for the web UI."""
+    investments_file = investments_file or Path(DEFAULT_INVESTMENTS_FILE)
+    sales_file = sales_file or Path(DEFAULT_SALES_FILE)
+    price_provider = price_provider or CompositePriceProvider()
+
+    movements = TradeRepublicImporter().load(movements_file)
+    investments = InvestmentRepository(investments_file).load()
+    sales = SaleRepository(sales_file).load()
+    engine = PortfolioEngine()
+
+    portfolio = engine.build(movements, investments=investments, sales=sales)
+    prices = price_provider.get_prices(list(portfolio.positions.keys()))
+    portfolio = engine.build(movements, prices, investments=investments, sales=sales)
+    return PortfolioReport.from_portfolio(portfolio)
+
+
+def serve(
+    movements_file: Path,
+    host: str = "127.0.0.1",
+    port: int = 8000,
+    investments_file: Path | None = None,
+    sales_file: Path | None = None,
+    price_provider=None,
+) -> None:
+    report = build_web_report(movements_file, investments_file, sales_file, price_provider)
     app = WebApp(report)
 
     class Handler(BaseHTTPRequestHandler):
@@ -51,10 +84,18 @@ def serve(movements_file: Path, host: str = "127.0.0.1", port: int = 8000) -> No
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run the PFP web dashboard")
     parser.add_argument("movements_file")
+    parser.add_argument("--investments-file", default=DEFAULT_INVESTMENTS_FILE)
+    parser.add_argument("--sales-file", default=DEFAULT_SALES_FILE)
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)
     args = parser.parse_args()
-    serve(Path(args.movements_file), args.host, args.port)
+    serve(
+        Path(args.movements_file),
+        args.host,
+        args.port,
+        Path(args.investments_file),
+        Path(args.sales_file),
+    )
 
 
 if __name__ == "__main__":
