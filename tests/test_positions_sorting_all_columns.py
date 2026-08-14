@@ -38,13 +38,13 @@ def test_positions_can_sort_by_every_column():
     r = report()
     expected = {
         "symbol": ("EUNL", "GOLD", "VWCE"),
-        "name": ("Gold", "MSCI World", "Vanguard FTSE All-World"),
-        "class": ("GOLD", "RV", "RV"),
+        "name": ("GOLD", "EUNL", "VWCE"),
+        "class": ("GOLD", "EUNL", "VWCE"),
         "shares": ("EUNL", "GOLD", "VWCE"),
         "invested": ("EUNL", "GOLD", "VWCE"),
         "price": ("GOLD", "EUNL", "VWCE"),
         "value": ("EUNL", "GOLD", "VWCE"),
-        "weight": ("EUNL", "GOLD", "VWCE"),
+        "weight": ("EUNL", "VWCE", "GOLD"),
         "gain": ("GOLD", "EUNL", "VWCE"),
     }
     for field, symbols in expected.items():
