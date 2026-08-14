@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 
 from pfp.domain.account import Account
-from pfp.domain.capital_flow import CapitalFlow, CapitalFlowType
+from pfp.domain.capital_flow import CapitalFlow, FlowType
 from pfp.domain.investment import Investment
 from pfp.domain.movement import Movement
 from pfp.domain.position import Position
@@ -42,14 +42,14 @@ class Portfolio:
                 raise ValueError("Position average price cannot be negative")
 
     def add_capital_flow(self, flow: CapitalFlow) -> None:
-        if flow.type == CapitalFlowType.CONTRIBUTION:
+        if flow.flow_type == FlowType.CONTRIBUTION:
             self.cash += flow.amount
-        elif flow.type == CapitalFlowType.WITHDRAWAL:
+        elif flow.flow_type == FlowType.WITHDRAWAL:
             if flow.amount > self.cash:
                 raise ValueError("Withdrawal exceeds portfolio cash")
             self.cash -= flow.amount
         else:
-            raise ValueError(f"Unsupported capital flow type: {flow.type}")
+            raise ValueError(f"Unsupported capital flow type: {flow.flow_type}")
 
         self.validate()
 
