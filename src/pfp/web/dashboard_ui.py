@@ -8,21 +8,13 @@ from pfp.excel.allocation_actions import build_allocation_rows
 from pfp.reporting.patrimony_evolution import PatrimonyEvolution
 from pfp.reporting.portfolio_report import PortfolioReport
 
-
-ALLOCATION_LABELS = {
-    "RV": "Renta variable",
-    "RF": "Renta fija",
-    "Oro": "Oro",
-    "Cripto": "Criptoactivos",
-}
-
+ALLOCATION_LABELS = {"RV": "Renta variable", "RF": "Renta fija", "Oro": "Oro", "Cripto": "Criptoactivos"}
 ALLOCATION_TIPS = {
     "RV": "Acciones y otros activos de renta variable. Objetivo actual: 75%.",
     "RF": "Bonos, fondos y otros activos de renta fija. Objetivo actual: 20%.",
     "Oro": "Exposición al oro como activo diversificador. Objetivo actual: 5%.",
     "Cripto": "Criptoactivos. Actualmente no tienen una asignación objetivo específica.",
 }
-
 METRIC_TIPS = {
     "Patrimonio total": "Efectivo más el valor de mercado de tus posiciones.",
     "Efectivo": "Dinero disponible que todavía no está invertido en posiciones.",
@@ -33,7 +25,7 @@ METRIC_TIPS = {
 }
 
 
-def dashboard_v2_html(report: PortfolioReport) -> str:
+def dashboard_v2_html(report: PortfolioReport, sort: str = "weight", direction: str = "desc") -> str:
     total = report.market_value
     values = {"RV": report.equity_value, "RF": report.fixed_income_value, "Oro": report.gold_value, "Cripto": report.crypto_value}
     targets = {"RV": Decimal("0.75"), "RF": Decimal("0.20"), "Oro": Decimal("0.05"), "Cripto": Decimal("0")}
@@ -43,39 +35,44 @@ def dashboard_v2_html(report: PortfolioReport) -> str:
         label = ALLOCATION_LABELS.get(row.asset_class, row.asset_class)
         tip = ALLOCATION_TIPS.get(row.asset_class, "Distribución de esta clase de activo dentro de la cartera.")
         weight = max(0, min(100, float(row.current_weight * 100))) if row.current_weight is not None else 0
-        bars.append(
-            '<div class="allocation-row">'
-            f'<div class="allocation-label"><span class="allocation-name">{escape(label)} {tooltip(tip)}</span><strong>{pct(row.current_weight)}</strong></div>'
-            f'<div class="bar"><span style="width:{weight:.2f}%"></span></div>'
-            f'<div class="allocation-meta">Objetivo {pct(row.target)} · {escape(row.action)}</div>'
-            '</div>'
-        )
+        bars.append('<div class="allocation-row">' f'<div class="allocation-label"><span class="allocation-name">{escape(label)} {tooltip(tip)}</span><strong>{pct(row.current_weight)}</strong></div>' f'<div class="bar"><span style="width:{weight:.2f}%"></span></div>' f'<div class="allocation-meta">Objetivo {pct(row.target)} · {escape(row.action)}</div>' '</div>')
 
-    positions = sorted(report.positions, key=lambda p: p.market_value or Decimal("0"), reverse=True)
-    position_rows = "".join(
-        f'<tr><td>{escape(p.ticker or p.isin or p.symbol)}</td><td>{escape(p.name)}</td><td>{pct(p.weight)}</td><td>{euro(p.market_value)}</td><td>{euro(p.gain_loss)}</td></tr>'
-        for p in positions[:10]
-    )
+    positions = sort_positions(report, sort, direction)
+    position_rows = "".join(f'<tr><td>{escape(p.ticker or p.isin or p.symbol)}</td><td>{escape(p.name)}</td><td>{pct(p.weight)}</td><td>{euro(p.market_value)}</td><td>{euro(p.gain_loss)}</td></tr>' for p in positions[:10])
     total_pl = report.realized_gain_loss + report.unrealized_gain_loss
-    evolution = _evolution_from_report(report)
-    evolution_html = _evolution_summary(evolution)
+    evolution_html = _evolution_summary(_evolution_from_report(report))
     return f"""
 <section class="dashboard-v2">
-  <div class="hero"><div><p class="eyebrow">PFP · Vista general</p><h1>Tu patrimonio</h1><p class="muted">Una lectura rápida de dónde está tu dinero y cómo se desvía de tu estrategia.</p></div><div class="hero-value">{euro(report.total_value)}</div></div>
+  <div class="hero"><div><p class="eyebrow">PFP · Vista general</p><h1>Tu patrimonio</h1><p class="muted">Una lectura rápida de dónde está tu dinero y cómo se desvía de tu estrategia.</p></div></div>
   <section class="metric-grid">{metric("Patrimonio total", report.total_value)}{metric("Efectivo", report.cash)}{metric("Cartera invertida", report.market_value)}{metric("P/L realizado", report.realized_gain_loss)}{metric("P/L no realizado", report.unrealized_gain_loss)}{metric("P/L total", total_pl, "positive" if total_pl >= 0 else "negative")}</section>
   {evolution_html}
-  <section class="two-col"><article class="panel"><div class="panel-heading"><h2>Asignación {tooltip("Distribución actual de tu patrimonio por clase de activo.")}</h2><span>Objetivo 75 / 20 / 5</span></div>{''.join(bars)}</article><article class="panel"><div class="panel-heading"><h2>Posiciones principales</h2><span>{len(report.positions)} activos</span></div><table><thead><tr><th>Activo</th><th>Nombre</th><th>Peso</th><th>Valor</th><th>P/L</th></tr></thead><tbody>{position_rows or '<tr><td colspan="5">Sin posiciones</td></tr>'}</tbody></table></article></section>
+  <section class="two-col"><article class="panel"><div class="panel-heading"><h2>Asignación {tooltip("Distribución actual de tu patrimonio por clase de activo.")}</h2><span>Objetivo 75 / 20 / 5</span></div>{''.join(bars)}</article><article class="panel"><div class="panel-heading"><h2>Posiciones principales</h2><span>{len(report.positions)} activos</span></div><table><thead><tr><th>Activo</th><th>Nombre</th>{sort_heading("Peso", "weight", sort, direction)}{sort_heading("Valor", "value", sort, direction)}<th>P/L</th></tr></thead><tbody>{position_rows or '<tr><td colspan="5">Sin posiciones</td></tr>'}</tbody></table></article></section>
 </section>
 """
+
+
+def sort_positions(report: PortfolioReport, sort: str, direction: str):
+    key_map = {
+        "name": lambda p: (p.name or "").lower(),
+        "weight": lambda p: p.weight if p.weight is not None else Decimal("-1"),
+        "value": lambda p: p.market_value if p.market_value is not None else Decimal("-1"),
+    }
+    key = key_map.get(sort, key_map["weight"])
+    return sorted(report.positions, key=key, reverse=direction != "asc")
+
+
+def sort_heading(label: str, field: str, current: str, direction: str) -> str:
+    next_direction = "asc" if current == field and direction != "asc" else "desc"
+    arrow = "↑" if current == field and direction == "asc" else "↓" if current == field else "↕"
+    return f'<th><a class="sortable-heading" href="/?sort={field}&direction={next_direction}">{label}<span class="sort-arrow">{arrow}</span></a></th>'
 
 
 def _evolution_from_report(report: PortfolioReport) -> PatrimonyEvolution:
     flows = []
     for movement in report.movements:
         movement_type = movement.type.upper().strip()
-        if movement_type not in {FlowType.CONTRIBUTION.value, FlowType.WITHDRAWAL.value}:
-            continue
-        flows.append(CapitalFlow(movement.datetime, abs(movement.amount), FlowType(movement_type), movement.transaction_id))
+        if movement_type in {FlowType.CONTRIBUTION.value, FlowType.WITHDRAWAL.value}:
+            flows.append(CapitalFlow(movement.datetime, abs(movement.amount), FlowType(movement_type), movement.transaction_id))
     return PatrimonyEvolution.from_capital_flows(flows)
 
 
