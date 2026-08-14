@@ -39,8 +39,11 @@ def dashboard_v2_html(report: PortfolioReport) -> str:
 <section class="dashboard-v2">
   <div class="hero"><div><p class="eyebrow">PFP · Vista general</p><h1>Tu patrimonio</h1><p class="muted">Una lectura rápida de dónde está tu dinero y cómo se desvía de tu estrategia.</p></div><div class="hero-value">{euro(report.total_value)}</div></div>
   <section class="metric-grid">
-    {metric("Cartera", report.market_value)}
+    {metric("Patrimonio total", report.total_value)}
     {metric("Efectivo", report.cash)}
+    {metric("Cartera invertida", report.market_value)}
+    {metric("P/L realizado", report.realized_gain_loss)}
+    {metric("P/L no realizado", report.unrealized_gain_loss)}
     {metric("P/L total", total_pl, "positive" if total_pl >= 0 else "negative")}
   </section>
   <section class="two-col">
