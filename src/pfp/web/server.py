@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -39,8 +40,9 @@ def build_web_report(
 
     portfolio = engine.build(movements, investments=investments, sales=sales)
     prices = price_provider.get_prices(list(portfolio.positions.keys()))
+    price_consulted_at = datetime.now().astimezone()
     portfolio = engine.build(movements, prices, investments=investments, sales=sales)
-    return PortfolioReport.from_portfolio(portfolio)
+    return PortfolioReport.from_portfolio(portfolio, price_consulted_at=price_consulted_at)
 
 
 def serve(
