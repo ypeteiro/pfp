@@ -38,16 +38,17 @@ def positions_html(report: PortfolioReport, sort: str = "weight", direction: str
 
 
 def sort_positions(report: PortfolioReport, sort: str, direction: str):
+    symbol = lambda p: (p.ticker or p.symbol or p.isin or "").lower()
     key_map = {
-        "symbol": lambda p: (p.ticker or p.symbol or p.isin or "").lower(),
-        "name": lambda p: (p.name or "").lower(),
-        "class": lambda p: (p.portfolio_class or "").lower(),
-        "shares": lambda p: p.shares,
-        "invested": lambda p: p.invested,
-        "price": lambda p: p.market_price if p.market_price is not None else Decimal("-1"),
-        "value": lambda p: p.market_value if p.market_value is not None else Decimal("-1"),
-        "weight": lambda p: p.weight if p.weight is not None else Decimal("-1"),
-        "gain": lambda p: p.gain_loss if p.gain_loss is not None else Decimal("-1"),
+        "symbol": lambda p: (symbol(p),),
+        "name": lambda p: ((p.name or "").lower(), symbol(p)),
+        "class": lambda p: ((p.portfolio_class or "").lower(), symbol(p)),
+        "shares": lambda p: (p.shares, symbol(p)),
+        "invested": lambda p: (p.invested, symbol(p)),
+        "price": lambda p: (p.market_price if p.market_price is not None else Decimal("-1"), symbol(p)),
+        "value": lambda p: (p.market_value if p.market_value is not None else Decimal("-1"), symbol(p)),
+        "weight": lambda p: (p.weight if p.weight is not None else Decimal("-1"), symbol(p)),
+        "gain": lambda p: (p.gain_loss if p.gain_loss is not None else Decimal("-1"), symbol(p)),
     }
     key = key_map.get(sort, key_map["weight"])
     return sorted(report.positions, key=key, reverse=direction != "asc")
