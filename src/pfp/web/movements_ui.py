@@ -15,10 +15,15 @@ def movements_html(report: PortfolioReport, broker: str = "", category: str = ""
     purchases = sum((abs(m.amount) for m in movements if is_purchase(m)), Decimal("0"))
     sales = sum((abs(m.amount) for m in movements if is_sale(m)), Decimal("0"))
     rows = "".join(movement_row(m) for m in movements) or '<tr><td colspan="12">Sin movimientos con los filtros seleccionados</td></tr>'
-    brokers = sorted({m.broker for m in report.movements if m.broker})
-    categories = sorted({m.category for m in report.movements if m.category})
-    types = sorted({m.type for m in report.movements if m.type})
-    asset_classes = sorted({m.asset_class for m in report.movements if m.asset_class})
+
+    # Imported data can contain mixed types (e.g. NaN/float in a column that is
+    # normally textual). Convert filter values to strings before sorting/rendering
+    # so one malformed value cannot make the whole page fail.
+    brokers = unique_sorted_values(m.broker for m in report.movements)
+    categories = unique_sorted_values(m.category for m in report.movements)
+    types = unique_sorted_values(m.type for m in report.movements)
+    asset_classes = unique_sorted_values(m.asset_class for m in report.movements)
+
     return f'''<h1>Movimientos</h1><p class="muted">Histórico de operaciones importadas, ordenado de más reciente a más antiguo.</p>
 <section class="panel movement-filters">{filter_form(brokers, categories, types, asset_classes, broker, category, movement_type, asset_class, search, date_from, date_to)}</section>
 <section class="metric-grid movement-metrics">{metric("Movimientos", Decimal(len(movements)), "count")}{metric("Compras", purchases)}{metric("Ventas", sales)}{metric("Comisiones", fees)}{metric("Impuestos", taxes)}</section>
@@ -40,15 +45,21 @@ def filter_form(brokers, categories, types, asset_classes, broker, category, mov
 </form>'''
 
 
+def unique_sorted_values(values) -> list[str]:
+    normalized = {str(value).strip() for value in values if value is not None and str(value).strip() and str(value).lower() != "nan"}
+    return sorted(normalized, key=str.casefold)
+
+
 def options(values, selected) -> str:
+    selected = str(selected or "")
     return "".join(f'<option value="{escape(str(value))}"{" selected" if str(value) == selected else ""}>{escape(str(value))}</option>' for value in values)
 
 
 def matches_filters(m: MovementReport, broker, category, movement_type, asset_class, search, date_from, date_to) -> bool:
-    if broker and m.broker != broker: return False
-    if category and m.category != category: return False
-    if movement_type and m.type != movement_type: return False
-    if asset_class and m.asset_class != asset_class: return False
+    if broker and str(m.broker or "") != str(broker): return False
+    if category and str(m.category or "") != str(category): return False
+    if movement_type and str(m.type or "") != str(movement_type): return False
+    if asset_class and str(m.asset_class or "") != str(asset_class): return False
     if date_from and m.datetime.date().isoformat() < date_from: return False
     if date_to and m.datetime.date().isoformat() > date_to: return False
     if search:
@@ -59,9 +70,9 @@ def matches_filters(m: MovementReport, broker, category, movement_type, asset_cl
 
 def movement_row(m: MovementReport) -> str:
     tone = "positive" if m.amount > 0 else "negative" if m.amount < 0 else ""
-    detail = escape(m.description or "—")
-    if m.transaction_id: detail += f'<small>ID: {escape(m.transaction_id)}</small>'
-    return f'''<tr><td>{escape(m.datetime.strftime("%d/%m/%Y %H:%M"))}</td><td>{escape(m.broker or "—")}</td><td>{escape(m.category or "—")}</td><td>{escape(m.type or "—")}</td><td><strong>{escape(m.symbol or "—")}</strong><small>{escape(m.name or "")}</small></td><td>{decimal_or_dash(m.shares)}</td><td>{euro(m.price)}</td><td class="{tone}">{euro(m.amount)}</td><td>{euro(m.fee)}</td><td>{euro(m.tax)}</td><td>{escape(m.currency or "—")}</td><td>{detail}</td></tr>'''
+    detail = escape(str(m.description) if m.description is not None else "—")
+    if m.transaction_id: detail += f'<small>ID: {escape(str(m.transaction_id))}</small>'
+    return f'''<tr><td>{escape(m.datetime.strftime("%d/%m/%Y %H:%M"))}</td><td>{escape(str(m.broker) if m.broker is not None else "—")}</td><td>{escape(str(m.category) if m.category is not None else "—")}</td><td>{escape(str(m.type) if m.type is not None else "—")}</td><td><strong>{escape(str(m.symbol) if m.symbol is not None else "—")}</strong><small>{escape(str(m.name) if m.name is not None else "")}</small></td><td>{decimal_or_dash(m.shares)}</td><td>{euro(m.price)}</td><td class="{tone}">{euro(m.amount)}</td><td>{euro(m.fee)}</td><td>{euro(m.tax)}</td><td>{escape(str(m.currency) if m.currency is not None else "—")}</td><td>{detail}</td></tr>'''
 
 
 def is_purchase(m: MovementReport) -> bool:
