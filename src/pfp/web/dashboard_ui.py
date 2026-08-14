@@ -44,10 +44,10 @@ def dashboard_v2_html(report: PortfolioReport, sort: str = "weight", direction: 
     evolution_html = _evolution_summary(_evolution_from_report(report))
     consulted_at = report.price_consulted_at or datetime.now().astimezone()
     consulted = consulted_at.strftime("%d/%m/%Y %H:%M")
-    price_status = f'<p class="price-status">Precios de mercado consultados: {consulted} {tooltip("Los precios de las posiciones proceden de las fuentes de mercado disponibles para cada activo. Consulta el icono de información junto a cada precio para ver la fuente concreta.")}</p>'
+    price_status = f'<p class="price-status">Precios de mercado consultados: {consulted}</p>'
     return f"""
 <section class="dashboard-v2">
-  <div class="hero"><div><p class="eyebrow">PFP · Vista general</p><h1>Tu patrimonio</h1><p class="muted">Una lectura rápida de dónde está tu dinero y cómo se desvía de tu estrategia.</p>{price_status}</div></div>
+  <div class="hero"><div><h1>Tu patrimonio</h1><p class="muted">Una lectura rápida de dónde está tu dinero y cómo se desvía de tu estrategia.</p>{price_status}</div></div>
   <section class="metric-grid">{metric("Patrimonio total", report.total_value)}{metric("Efectivo", report.cash)}{metric("Cartera invertida", report.market_value)}{metric("P/L realizado", report.realized_gain_loss)}{metric("P/L no realizado", report.unrealized_gain_loss)}{metric("P/L total", total_pl, "positive" if total_pl >= 0 else "negative")}</section>
   {evolution_html}
   <section class="two-col"><article class="panel"><div class="panel-heading"><h2>Asignación {tooltip("Distribución actual de tu patrimonio por clase de activo.")}</h2><span>Objetivo 75 / 20 / 5</span></div>{''.join(bars)}</article><article class="panel"><div class="panel-heading"><h2>Posiciones principales</h2><span>{len(report.positions)} activos</span></div><table><thead><tr>{sort_heading("Activo", "symbol", sort, direction)}{sort_heading("Nombre", "name", sort, direction)}{sort_heading("Peso", "weight", sort, direction)}{sort_heading("Valor", "value", sort, direction)}<th>P/L</th></tr></thead><tbody>{position_rows or '<tr><td colspan="5">Sin posiciones</td></tr>'}</tbody></table></article></section>
