@@ -13,6 +13,10 @@ class Position:
     market_price: Decimal | None = None
 
     def __post_init__(self) -> None:
+        # Keep backwards compatibility with callers that historically left
+        # average_price at its default value while providing shares + invested.
+        if self.shares > 0 and self.invested > 0 and self.average_price == 0:
+            self.average_price = self.invested / self.shares
         self.validate()
 
     def validate(self) -> None:
