@@ -5,10 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 from html import escape
-from pathlib import Path
 
 from pfp.reporting.portfolio_report import PortfolioReport
 from pfp.web.dashboard import build_dashboard
+from pfp.web.dashboard_ui import dashboard_v2_html
 from pfp.web.navigation import navigation_html
 
 
@@ -37,10 +37,7 @@ class WebApp:
 <main>{content}</main></body></html>"""
 
     def _dashboard(self) -> str:
-        model = build_dashboard(self.report)
-        cards = "".join(f'<article class="card"><small>{escape(c.label)}</small><strong>{euro(c.value)}</strong></article>' for c in model.cards)
-        allocation = "".join(f'<tr><td>{escape(a.asset_class)}</td><td>{euro(a.value)}</td><td>{pct(a.weight)}</td></tr>' for a in model.allocation)
-        return f'<h1>Dashboard</h1><section class="grid">{cards}</section><section class="panel"><h2>Asignación actual</h2><table><tr><th>Clase</th><th>Valor</th><th>Peso</th></tr>{allocation}</table></section>'
+        return dashboard_v2_html(self.report)
 
     def _positions(self) -> str:
         rows = "".join(
@@ -71,7 +68,7 @@ class WebApp:
 
 
 CSS = """
-:root{font-family:Inter,Segoe UI,sans-serif;color:#172033;background:#f5f7fb}body{margin:0}header{background:#172033;color:white;padding:18px 32px;display:flex;justify-content:space-between;align-items:center;gap:24px}header strong{font-size:22px}header span{margin-left:12px;color:#aeb8c8;font-size:13px}nav{display:flex;gap:8px;flex-wrap:wrap}nav a{color:#cbd5e1;text-decoration:none;padding:8px 12px;border-radius:8px}nav a.active,nav a:hover{background:#334155;color:white}main{max-width:1180px;margin:0 auto;padding:32px}h1{margin-top:0}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:24px 0}.card,.panel{background:white;border:1px solid #e3e8f0;border-radius:14px;padding:20px;box-shadow:0 2px 8px #17203310}.card small{display:block;color:#687386}.card strong{display:block;font-size:26px;margin-top:8px}table{width:100%;border-collapse:collapse}th,td{padding:11px 12px;border-bottom:1px solid #edf0f5;text-align:left}th{background:#eaf1f8;font-size:13px}@media(max-width:800px){header{padding:16px;align-items:flex-start;flex-direction:column}main{padding:18px}.grid{grid-template-columns:1fr 1fr}}@media(max-width:520px){.grid{grid-template-columns:1fr}table{font-size:13px}}
+:root{font-family:Inter,Segoe UI,sans-serif;color:#172033;background:#f5f7fb}body{margin:0}header{background:#172033;color:white;padding:18px 32px;display:flex;justify-content:space-between;align-items:center;gap:24px}header strong{font-size:22px}header span{margin-left:12px;color:#aeb8c8;font-size:13px}nav{display:flex;gap:8px;flex-wrap:wrap}nav a{color:#cbd5e1;text-decoration:none;padding:8px 12px;border-radius:8px}nav a.active,nav a:hover{background:#334155;color:white}main{max-width:1180px;margin:0 auto;padding:32px}h1{margin-top:0}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:24px 0}.card,.panel{background:white;border:1px solid #e3e8f0;border-radius:14px;padding:20px;box-shadow:0 2px 8px #17203310}.card small{display:block;color:#687386}.card strong{display:block;font-size:26px;margin-top:8px}table{width:100%;border-collapse:collapse}th,td{padding:11px 12px;border-bottom:1px solid #edf0f5;text-align:left}th{background:#eaf1f8;font-size:13px}.hero{display:flex;justify-content:space-between;gap:24px;align-items:end}.eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#64748b}.hero-value{font-size:34px;font-weight:700}.muted{color:#687386}.metric-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:24px 0}.metric{background:white;border:1px solid #e3e8f0;border-radius:14px;padding:18px}.metric span{display:block;color:#687386;font-size:13px}.metric strong{display:block;font-size:24px;margin-top:6px}.metric.positive strong{color:#15803d}.metric.negative strong{color:#b91c1c}.two-col{display:grid;grid-template-columns:1fr 1.4fr;gap:18px}.panel-heading{display:flex;justify-content:space-between;align-items:center;gap:16px}.panel-heading span{font-size:12px;color:#687386}.allocation-row{margin:18px 0}.allocation-label{display:flex;justify-content:space-between;font-weight:600}.bar{height:10px;background:#e5e7eb;border-radius:99px;overflow:hidden;margin:7px 0}.bar span{display:block;height:100%;background:#2563eb;border-radius:99px}.allocation-meta{font-size:12px;color:#687386}@media(max-width:800px){header{padding:16px;align-items:flex-start;flex-direction:column}main{padding:18px}.grid,.metric-grid{grid-template-columns:1fr 1fr}.two-col{grid-template-columns:1fr}}@media(max-width:520px){.grid,.metric-grid{grid-template-columns:1fr}table{font-size:13px}.hero{align-items:flex-start;flex-direction:column}.hero-value{font-size:28px}}
 """
 
 
