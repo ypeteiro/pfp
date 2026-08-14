@@ -11,6 +11,11 @@ from pfp.reporting.portfolio_report import PortfolioReport
 from pfp.web.app import WebApp
 
 
+def dashboard_html(report: PortfolioReport) -> str:
+    """Render the legacy dashboard entry point used by the existing tests."""
+    return WebApp(report).render("/")
+
+
 def serve(movements_file: Path, host: str = "127.0.0.1", port: int = 8000) -> None:
     portfolio = load_portfolio(movements_file)
     report = PortfolioReport.from_portfolio(portfolio)
