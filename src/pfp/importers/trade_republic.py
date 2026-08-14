@@ -7,12 +7,19 @@ import pandas as pd
 from pfp.domain.capital_flow import CapitalFlow, FlowType
 from pfp.domain.movement import Movement
 from pfp.importers.base import Importer
+from pfp.importers.report import ImportReport
 from pfp.importers.validation import ImportValidationError, validate_movements
 
 
 class TradeRepublicImporter(Importer):
 
     def load(self, path: Path) -> list[Movement]:
+        report = self.load_report(path)
+        if not report.ok:
+            raise ImportValidationError(report.issues)
+        return list(report.movements)
+
+    def load_report(self, path: Path) -> ImportReport:
         df = pd.read_csv(path)
         movements: list[Movement] = []
 
@@ -21,13 +28,9 @@ class TradeRepublicImporter(Importer):
                 Movement(
                     datetime=datetime.fromisoformat(row["datetime"].replace("Z", "+00:00")),
                     date=datetime.strptime(row["date"], "%Y-%m-%d"),
-                    account_type=row["account_type"],
-                    broker="Trade Republic",
-                    category=row["category"],
-                    type=row["type"],
-                    asset_class=row["asset_class"],
-                    name=row["name"],
-                    symbol=None if pd.isna(row["symbol"]) else row["symbol"],
+                    account_type=row["account_type"], broker="Trade Republic",
+                    category=row["category"], type=row["type"], asset_class=row["asset_class"],
+                    name=row["name"], symbol=None if pd.isna(row["symbol"]) else row["symbol"],
                     shares=None if pd.isna(row["shares"]) else Decimal(str(row["shares"])),
                     price=None if pd.isna(row["price"]) else Decimal(str(row["price"])),
                     amount=Decimal(str(row["amount"])),
@@ -46,10 +49,7 @@ class TradeRepublicImporter(Importer):
                 )
             )
 
-        issues = validate_movements(movements)
-        if issues:
-            raise ImportValidationError(issues)
-        return movements
+        return ImportReport(tuple(movements), validate_movements(movements))
 
     def load_capital_flows(self, path: Path) -> list[CapitalFlow]:
         return self.capital_flows_from_movements(self.load(path))
@@ -57,39 +57,13 @@ class TradeRepublicImporter(Importer):
     @staticmethod
     def capital_flows_from_movements(movements: list[Movement]) -> list[CapitalFlow]:
         flows: list[CapitalFlow] = []
-
         for movement in movements:
-            if movement.category != "CASH":
-                continue
-
+            if movement.category != "CASH": continue
             movement_type = movement.type.upper()
-            flow_type = None
-
-            if movement_type in {
-                "TRANSFER_INSTANT_INBOUND",
-                "DEPOSIT",
-                "CASH_IN",
-                "TRANSFER_INBOUND",
-            } or movement_type.endswith("_INBOUND"):
+            if movement_type in {"TRANSFER_INSTANT_INBOUND", "DEPOSIT", "CASH_IN", "TRANSFER_INBOUND"} or movement_type.endswith("_INBOUND"):
                 flow_type = FlowType.CONTRIBUTION
-            elif movement_type in {
-                "TRANSFER_INSTANT_OUTBOUND",
-                "WITHDRAWAL",
-                "CASH_OUT",
-                "TRANSFER_OUTBOUND",
-            } or movement_type.endswith("_OUTBOUND"):
+            elif movement_type in {"TRANSFER_INSTANT_OUTBOUND", "WITHDRAWAL", "CASH_OUT", "TRANSFER_OUTBOUND"} or movement_type.endswith("_OUTBOUND"):
                 flow_type = FlowType.WITHDRAWAL
-
-            if flow_type is None:
-                continue
-
-            flows.append(
-                CapitalFlow(
-                    datetime=movement.datetime,
-                    amount=abs(movement.amount),
-                    flow_type=flow_type,
-                    transaction_id=movement.transaction_id,
-                )
-            )
-
+            else: continue
+            flows.append(CapitalFlow(datetime=movement.datetime, amount=abs(movement.amount), flow_type=flow_type, transaction_id=movement.transaction_id))
         return sorted(flows, key=lambda flow: flow.datetime)
