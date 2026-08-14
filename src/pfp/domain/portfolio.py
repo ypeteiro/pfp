@@ -41,6 +41,32 @@ class Portfolio:
             if position.average_price < 0:
                 raise ValueError("Position average price cannot be negative")
 
+    @property
+    def market_value(self) -> Decimal | None:
+        """Return the total market value when all open positions are priced."""
+        total = Decimal("0")
+        for position in self.positions.values():
+            if position.market_value is None:
+                return None
+            total += position.market_value
+        return total
+
+    @property
+    def total_value(self) -> Decimal | None:
+        """Return cash plus market value when all open positions are priced."""
+        market_value = self.market_value
+        if market_value is None:
+            return None
+        return self.cash + market_value
+
+    @property
+    def unrealized_gain_loss(self) -> Decimal | None:
+        """Return unrealized gain/loss when all open positions are priced."""
+        market_value = self.market_value
+        if market_value is None:
+            return None
+        return market_value - self.invested
+
     def add_capital_flow(self, flow: CapitalFlow) -> None:
         if flow.flow_type == FlowType.CONTRIBUTION:
             self.cash += flow.amount
