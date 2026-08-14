@@ -56,8 +56,12 @@ def price_tooltip(symbol: str, consulted_at: datetime | None = None) -> str:
         source = "Proveedor de precios"
     consulted_at = consulted_at or datetime.now().astimezone()
     consulted = consulted_at.strftime("%d/%m/%Y %H:%M")
-    text = f"Fuente: {source}. Fecha de consulta: {consulted}. Último precio disponible obtenido por PFP."
-    return f'<span class="tooltip price-tooltip" tabindex="0" aria-label="Información del precio">ⓘ<span class="tooltip-content">{escape(text)}</span></span>'
+    tooltip = (
+        f'<strong>Fuente:</strong> {escape(source)}<br>'
+        f'<strong>Fecha de consulta:</strong> {consulted}<br>'
+        "<strong>Último precio disponible</strong> obtenido por PFP."
+    )
+    return f'<span class="tooltip price-tooltip" tabindex="0" aria-label="Información del precio">ⓘ<span class="tooltip-content">{tooltip}</span></span>'
 
 
 def sort_positions(report: PortfolioReport, sort: str, direction: str):
