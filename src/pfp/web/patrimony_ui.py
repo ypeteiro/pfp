@@ -17,7 +17,10 @@ def patrimony_evolution_html(evolution: PatrimonyEvolution) -> str:
     )
     first, last = points[0], points[-1]
     change = last.cumulative_contributed - first.cumulative_contributed
-    chart = "".join(f'<span style="height:{chart_height(p.cumulative_contributed, maximum)}%" title="{escape(p.datetime.strftime("%d/%m/%Y"))}: {euro(p.cumulative_contributed)}"></span>' for p in points)
+    chart = "".join(
+        f'<span style="height:{chart_height(p.cumulative_contributed, maximum)}%" title="{escape(p.datetime.strftime("%d/%m/%Y"))}: {euro(p.cumulative_contributed)}"></span>'
+        for p in points
+    )
     return f'''<section class="panel patrimony-evolution"><div class="panel-heading"><h2>Evolución patrimonial</h2><span>{len(points)} puntos</span></div>
 <div class="evolution-summary"><div><span>Capital neto aportado</span><strong>{euro(last.cumulative_contributed)}</strong></div><div><span>Aportaciones</span><strong>{euro(evolution.total_contributions)}</strong></div><div><span>Retiradas</span><strong>{euro(evolution.total_withdrawals)}</strong></div><div><span>Variación</span><strong class="{'positive' if change >= 0 else 'negative'}">{euro(change)}</strong></div></div>
 <div class="evolution-chart" role="img" aria-label="Evolución del capital neto aportado"><div class="chart-line">{chart}</div></div>
@@ -27,7 +30,8 @@ def patrimony_evolution_html(evolution: PatrimonyEvolution) -> str:
 def chart_height(value: Decimal, maximum: Decimal) -> str:
     if maximum <= 0:
         return "0"
-    return f"{max(4, min(100, float(value / maximum * Decimal("100")))):.2f}"
+    percent = value / maximum * Decimal("100")
+    return f"{max(4, min(100, float(percent))):.2f}"
 
 
 def euro(value: Decimal | None) -> str:
