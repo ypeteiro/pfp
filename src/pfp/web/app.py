@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
-from html import escape
 
 from pfp.reporting.portfolio_report import PortfolioReport
+from pfp.web.allocation_ui import allocation_html
 from pfp.web.dashboard_ui import dashboard_v2_html
 from pfp.web.movements_ui import movements_html
 from pfp.web.navigation import navigation_html
@@ -37,27 +37,9 @@ class WebApp:
         return movements_html(self.report)
 
     def _allocation(self) -> str:
-        values = {"RV": self.report.equity_value, "RF": self.report.fixed_income_value, "Oro": self.report.gold_value, "Cripto": self.report.crypto_value}
-        targets = {"RV": Decimal("0.75"), "RF": Decimal("0.20"), "Oro": Decimal("0.05"), "Cripto": Decimal("0")}
-        total = self.report.market_value
-        rows = []
-        for asset_class, target in targets.items():
-            value = values[asset_class]; weight = value / total if total else Decimal("0"); deviation = weight - target
-            action = "Aumentar" if deviation < Decimal("-0.02") else "Reducir" if deviation > Decimal("0.02") else "Mantener"
-            rows.append(f'<tr><td>{asset_class}</td><td>{pct(target)}</td><td>{pct(weight)}</td><td>{pct(deviation)}</td><td>{action}</td></tr>')
-        return '<h1>Asignación</h1><section class="panel"><table><tr><th>Clase</th><th>Objetivo</th><th>Actual</th><th>Desviación</th><th>Acción</th></tr>' + ''.join(rows) + '</table></section>'
+        return allocation_html(self.report)
 
 
 CSS = """
-:root{font-family:Inter,Segoe UI,sans-serif;color:#172033;background:#f5f7fb}body{margin:0}header{background:#172033;color:white;padding:18px 32px;display:flex;justify-content:space-between;align-items:center;gap:24px}header strong{font-size:22px}header span{margin-left:12px;color:#aeb8c8;font-size:13px}nav{display:flex;gap:8px;flex-wrap:wrap}nav a{color:#cbd5e1;text-decoration:none;padding:8px 12px;border-radius:8px}nav a.active,nav a:hover{background:#334155;color:white}main{max-width:1180px;margin:0 auto;padding:32px}h1{margin-top:0}.panel{background:white;border:1px solid #e3e8f0;border-radius:14px;padding:20px;box-shadow:0 2px 8px #17203310}.metric-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin:18px 0}.metric{background:white;border:1px solid #e3e8f0;border-radius:12px;padding:16px}.metric span{display:block;color:#687386;font-size:12px}.metric strong{display:block;font-size:22px;margin-top:6px}.positive{color:#15803d}.negative{color:#b91c1c}.muted{color:#687386}.panel-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}.panel-heading h2{margin:0}.panel-heading span{color:#687386;font-size:12px}.table-scroll{overflow-x:auto}table{width:100%;border-collapse:collapse}th,td{padding:11px 12px;border-bottom:1px solid #edf0f5;text-align:left;white-space:nowrap}th{background:#eaf1f8;font-size:13px}td small{display:block;color:#687386;font-size:11px;margin-top:3px}@media(max-width:800px){header{padding:16px;align-items:flex-start;flex-direction:column}main{padding:18px}.metric-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+:root{font-family:Inter,Segoe UI,sans-serif;color:#172033;background:#f5f7fb}body{margin:0}header{background:#172033;color:white;padding:18px 32px;display:flex;justify-content:space-between;align-items:center;gap:24px}header strong{font-size:22px}header span{margin-left:12px;color:#aeb8c8;font-size:13px}nav{display:flex;gap:8px;flex-wrap:wrap}nav a{color:#cbd5e1;text-decoration:none;padding:8px 12px;border-radius:8px}nav a.active,nav a:hover{background:#334155;color:white}main{max-width:1180px;margin:0 auto;padding:32px}h1{margin-top:0}.panel{background:white;border:1px solid #e3e8f0;border-radius:14px;padding:20px;box-shadow:0 2px 8px #17203310}.metric-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin:18px 0}.metric{background:white;border:1px solid #e3e8f0;border-radius:12px;padding:16px}.metric span{display:block;color:#687386;font-size:12px}.metric strong{display:block;font-size:22px;margin-top:6px}.positive{color:#15803d}.negative{color:#b91c1c}.muted{color:#687386}.panel-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}.panel-heading h2{margin:0}.panel-heading span{color:#687386;font-size:12px}.table-scroll{overflow-x:auto}table{width:100%;border-collapse:collapse}th,td{padding:11px 12px;border-bottom:1px solid #edf0f5;text-align:left;white-space:nowrap}th{background:#eaf1f8;font-size:13px}td small{display:block;color:#687386;font-size:11px;margin-top:3px}.allocation-recommendation{margin:18px 0}.allocation-recommendation h2{margin-top:0}@media(max-width:800px){header{padding:16px;align-items:flex-start;flex-direction:column}main{padding:18px}.metric-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 """
-
-
-def euro(value: Decimal | None) -> str:
-    if value is None: return "—"
-    return f"{value:,.2f} €".replace(",", "X").replace(".", ",").replace("X", ".")
-
-
-def pct(value: Decimal | None) -> str:
-    if value is None: return "—"
-    return f"{value * 100:.2f}%".replace(".", ",")
