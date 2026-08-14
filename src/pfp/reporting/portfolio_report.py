@@ -64,9 +64,14 @@ class PortfolioReport:
     positions: tuple[PositionReport, ...]
     accounts: tuple[AccountReport, ...] = ()
     movements: tuple[MovementReport, ...] = ()
+    price_consulted_at: datetime | None = None
 
     @classmethod
-    def from_portfolio(cls, portfolio: Portfolio) -> "PortfolioReport":
+    def from_portfolio(
+        cls,
+        portfolio: Portfolio,
+        price_consulted_at: datetime | None = None,
+    ) -> "PortfolioReport":
         market_value = sum((position.market_value or Decimal("0") for position in portfolio.positions.values()), Decimal("0"))
         unrealized_gain_loss = sum((position.gain_loss or Decimal("0") for position in portfolio.positions.values()), Decimal("0"))
         class_map = {"RV": "RV", "EQUITY": "RV", "RF": "RF", "FIXED_INCOME": "RF", "GOLD": "GOLD", "CRYPTO": "CRYPTO"}
@@ -114,4 +119,5 @@ class PortfolioReport:
             positions=tuple(positions),
             accounts=accounts,
             movements=movements,
+            price_consulted_at=price_consulted_at,
         )
