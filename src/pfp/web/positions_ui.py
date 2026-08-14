@@ -55,7 +55,7 @@ def price_tooltip(symbol: str) -> str:
     else:
         source = "Proveedor de precios"
     consulted = date.today().strftime("%d/%m/%Y")
-    text = f"Fuente: {source}. Fecha de consulta: {consulted}. El precio mostrado corresponde al último precio disponible obtenido por PFP."
+    text = f"Fuente: {source}. Fecha de consulta: {consulted}. Último precio disponible obtenido por PFP."
     return f'<span class="tooltip price-tooltip" tabindex="0" aria-label="Información del precio">ⓘ<span class="tooltip-content">{escape(text)}</span></span>'
 
 
