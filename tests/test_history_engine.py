@@ -7,8 +7,12 @@ from pfp.engine.history_engine import HistoryEngine
 
 
 def _snapshot(day, value):
+    return _snapshot_at(datetime(2026, 8, day, tzinfo=timezone.utc), value)
+
+
+def _snapshot_at(timestamp, value):
     return PortfolioSnapshot(
-        datetime=datetime(2026, 8, day, tzinfo=timezone.utc),
+        datetime=timestamp,
         total_value=Decimal(str(value)),
         cash=Decimal("0"),
         invested_cost=Decimal("0"),
@@ -97,3 +101,56 @@ def test_history_includes_withdrawals_in_net_capital_flow():
     assert point.capital_flow == Decimal("-1000")
     assert point.cumulative_capital_flow == Decimal("-1000")
     assert point.performance == Decimal("400")
+
+
+def test_history_exposes_xirr_for_single_annual_contribution():
+    history = HistoryEngine().build(
+        [
+            _snapshot_at(datetime(2026, 1, 1, tzinfo=timezone.utc), "1000"),
+            _snapshot_at(datetime(2027, 1, 1, tzinfo=timezone.utc), "1100"),
+        ],
+        [
+            CapitalFlow(
+                datetime=datetime(2026, 1, 1, tzinfo=timezone.utc),
+                amount=Decimal("1000"),
+                flow_type=FlowType.CONTRIBUTION,
+            )
+        ],
+    )
+
+    assert history.xirr is not None
+    assert abs(history.xirr - Decimal("0.10")) < Decimal("1E-20")
+    assert abs(history.xirr_percent - Decimal("10")) < Decimal("1E-18")
+
+
+def test_history_xirr_accounts_for_withdrawal():
+    history = HistoryEngine().build(
+        [
+            _snapshot_at(datetime(2026, 1, 1, tzinfo=timezone.utc), "1000"),
+            _snapshot_at(datetime(2026, 7, 1, tzinfo=timezone.utc), "500"),
+        ],
+        [
+            CapitalFlow(
+                datetime=datetime(2026, 1, 1, tzinfo=timezone.utc),
+                amount=Decimal("1000"),
+                flow_type=FlowType.CONTRIBUTION,
+            ),
+            CapitalFlow(
+                datetime=datetime(2026, 4, 1, tzinfo=timezone.utc),
+                amount=Decimal("600"),
+                flow_type=FlowType.WITHDRAWAL,
+            ),
+        ],
+    )
+
+    assert history.xirr is not None
+    assert history.xirr < Decimal("0")
+
+
+def test_history_xirr_is_none_without_capital_flows():
+    history = HistoryEngine().build(
+        [_snapshot(1, "1000"), _snapshot(2, "1100")]
+    )
+
+    assert history.xirr is None
+    assert history.xirr_percent is None
