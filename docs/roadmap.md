@@ -12,8 +12,10 @@
 - [x] Market-price source and consultation timestamp.
 - [x] README/help access from the web UI.
 - [x] Refresh portfolio data from the web UI without restarting the server.
-- [ ] Movements view with clearer filtering and transaction details.
-- [ ] Allocation view with actionable rebalance information.
+- [x] Movements view with filtering and transaction details.
+- [x] Allocation view with actionable rebalance information.
+- [x] Patrimony evolution summary from historical capital flows.
+- [x] TWR and XIRR performance calculations.
 
 ## v1.2 — Web operations
 - [ ] Register investment orders from the web UI.
