@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
 from datetime import datetime
+from decimal import Decimal, InvalidOperation
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+from pfp.application.register_investment import RegisterInvestment, RegisterInvestmentRequest
 from pfp.cli import DEFAULT_INVESTMENTS_FILE, DEFAULT_SALES_FILE
+from pfp.domain.portfolio import Portfolio
 from pfp.engine.portfolio_engine import PortfolioEngine
 from pfp.importers.investment_repository import InvestmentRepository
 from pfp.importers.sale_repository import SaleRepository
@@ -45,6 +49,76 @@ def build_web_report(
     return PortfolioReport.from_portfolio(portfolio, price_consulted_at=price_consulted_at)
 
 
+
+@dataclass(slots=True)
+class WebRuntime:
+    """Mutable in-memory state for the web session.
+
+    Persistence is intentionally outside this PR. A runtime keeps the portfolio
+    object alive so a successful form submission is immediately visible in the
+    web UI without pretending that it has been written to disk.
+    """
+
+    portfolio: Portfolio
+    price_provider: object
+
+    def report(self) -> PortfolioReport:
+        prices = self.price_provider.get_prices(list(self.portfolio.positions.keys()))
+        for symbol, position in self.portfolio.positions.items():
+            position.market_price = prices.get(symbol)
+        return PortfolioReport.from_portfolio(
+            self.portfolio,
+            price_consulted_at=datetime.now().astimezone(),
+        )
+
+
+def build_web_runtime(
+    movements_file: Path,
+    investments_file: Path | None = None,
+    sales_file: Path | None = None,
+    price_provider=None,
+) -> WebRuntime:
+    """Build the mutable in-memory portfolio used by interactive web actions."""
+    investments_file = investments_file or Path(DEFAULT_INVESTMENTS_FILE)
+    sales_file = sales_file or Path(DEFAULT_SALES_FILE)
+    price_provider = price_provider or CompositePriceProvider()
+
+    movements = TradeRepublicImporter().load(movements_file)
+    investments = InvestmentRepository(investments_file).load()
+    sales = SaleRepository(sales_file).load()
+    portfolio = PortfolioEngine().build(movements, investments=investments, sales=sales)
+    return WebRuntime(portfolio, price_provider)
+
+
+def parse_investment_request(form: dict[str, list[str]]) -> RegisterInvestmentRequest:
+    """Translate HTML form values into the application request contract."""
+    def required(name: str) -> str:
+        values = form.get(name, [])
+        value = values[0].strip() if values else ""
+        if not value:
+            raise ValueError(f"El campo «{name}» es obligatorio")
+        return value
+
+    try:
+        when = datetime.fromisoformat(required("datetime"))
+        shares = Decimal(required("shares"))
+        amount = Decimal(required("amount"))
+        price = Decimal(required("price"))
+    except (ValueError, InvalidOperation) as exc:
+        raise ValueError("Fecha, participaciones, importe o precio no válidos") from exc
+
+    return RegisterInvestmentRequest(
+        datetime=when,
+        symbol=required("symbol"),
+        shares=shares,
+        amount=amount,
+        price=price,
+        portfolio_class=required("portfolio_class"),
+        broker=required("broker"),
+        operation_id=(form.get("operation_id", [""])[0].strip() or None),
+    )
+
+
 def serve(
     movements_file: Path,
     host: str = "127.0.0.1",
@@ -53,18 +127,20 @@ def serve(
     sales_file: Path | None = None,
     price_provider=None,
 ) -> None:
-    def make_app() -> WebApp:
-        return WebApp(build_web_report(movements_file, investments_file, sales_file, price_provider))
+    def make_runtime() -> WebRuntime:
+        return build_web_runtime(movements_file, investments_file, sales_file, price_provider)
 
-    app = make_app()
+    runtime = make_runtime()
+    app = WebApp(runtime.report())
 
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):  # noqa: N802
-            nonlocal app
+            nonlocal app, runtime
             path = self.path
             if path == "/refresh":
                 try:
-                    app = make_app()
+                    runtime = make_runtime()
+                    app = WebApp(runtime.report())
                 except Exception as exc:  # pragma: no cover - exercised through a live server
                     self.send_error(500, f"No se han podido actualizar los datos: {exc}")
                     return
@@ -73,7 +149,6 @@ def serve(
                 self.end_headers()
                 return
 
-            # Keep the query string: WebApp uses it to apply sorting.
             try:
                 body = app.render(path).encode("utf-8")
             except KeyError:
@@ -84,6 +159,33 @@ def serve(
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
+
+        def do_POST(self):  # noqa: N802
+            nonlocal app
+            if self.path != "/investments":
+                self.send_error(404)
+                return
+
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                raw = self.rfile.read(length).decode("utf-8")
+                form = parse_qs(raw, keep_blank_values=True)
+                request = parse_investment_request(form)
+                RegisterInvestment().execute(runtime.portfolio, request)
+                app = WebApp(runtime.report())
+            except (ValueError, InvalidOperation) as exc:
+                values = {key: values[0] if values else "" for key, values in form.items()} if "form" in locals() else {}
+                body = app.render_investment_form(str(exc), values).encode("utf-8")
+                self.send_response(400)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
+
+            self.send_response(303)
+            self.send_header("Location", "/positions")
+            self.end_headers()
 
         def log_message(self, fmt, *args):
             return
