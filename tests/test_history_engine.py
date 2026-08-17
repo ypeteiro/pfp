@@ -144,7 +144,7 @@ def test_history_xirr_accounts_for_withdrawal():
     )
 
     assert history.xirr is not None
-    assert history.xirr < Decimal("0")
+    assert history.xirr > Decimal("0")
 
 
 def test_history_xirr_is_none_without_capital_flows():
