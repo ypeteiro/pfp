@@ -107,3 +107,22 @@ def test_save_with_same_operation_id_is_idempotent(tmp_path):
     investments = repository.load()
     assert len(investments) == 1
     assert investments[0] == first
+
+
+def test_exists_by_operation_id_returns_true_for_existing_operation(tmp_path):
+    repository = InvestmentRepository(tmp_path / "investments.csv")
+    investment = Investment(
+        datetime=datetime(2026, 8, 10, tzinfo=timezone.utc),
+        symbol="TEST",
+        shares=Decimal("1"),
+        amount=Decimal("100"),
+        price=Decimal("100"),
+        portfolio_class="EQUITY",
+        operation_id="op-1",
+    )
+
+    repository.save(investment)
+
+    assert repository.exists_by_operation_id("op-1")
+    assert not repository.exists_by_operation_id("op-2")
+    assert not repository.exists_by_operation_id("")

@@ -83,3 +83,28 @@ def test_web_runtime_persists_registered_investment(tmp_path):
 
     assert repository.load() == [investment]
     assert portfolio.invested == Decimal("250")
+
+
+def test_web_runtime_duplicate_operation_id_does_not_modify_portfolio(tmp_path):
+    repository = InvestmentRepository(tmp_path / "investments.csv")
+
+    class FakePriceProvider:
+        def get_prices(self, symbols):
+            return {}
+
+    portfolio = Portfolio(cash=Decimal("1000"))
+    runtime = WebRuntime(portfolio, FakePriceProvider(), repository)
+    request = parse_investment_request(form())
+
+    runtime.register_investment(request)
+    cash_after_first = portfolio.cash
+    invested_after_first = portfolio.invested
+    shares_after_first = portfolio.positions["VWCE"].shares
+
+    with pytest.raises(ValueError, match="ya ha sido registrada"):
+        runtime.register_investment(request)
+
+    assert portfolio.cash == cash_after_first
+    assert portfolio.invested == invested_after_first
+    assert portfolio.positions["VWCE"].shares == shares_after_first
+    assert len(repository.load()) == 1

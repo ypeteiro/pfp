@@ -58,6 +58,14 @@ class InvestmentRepository:
                 row["operation_id"] = row.get("operation_id") or ""
                 writer.writerow({field: row.get(field, "") for field in self.FIELDNAMES})
 
+    def exists_by_operation_id(self, operation_id: str) -> bool:
+        if not operation_id or not operation_id.strip():
+            return False
+        return any(
+            existing.operation_id == operation_id
+            for existing in self.load()
+        )
+
     def save(self, investment):
         self.path.parent.mkdir(parents=True, exist_ok=True)
 
