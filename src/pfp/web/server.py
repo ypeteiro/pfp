@@ -67,6 +67,14 @@ class WebRuntime:
     def register_investment(self, request: RegisterInvestmentRequest):
         if self.investment_repository is None:
             raise RuntimeError("Investment repository is not configured")
+        if (
+            request.operation_id
+            and self.investment_repository.exists_by_operation_id(request.operation_id)
+        ):
+            raise ValueError(
+                f"La operación «{request.operation_id}» ya ha sido registrada"
+            )
+
         investment = RegisterInvestment().execute(self.portfolio, request)
         self.investment_repository.save(investment)
         return investment
