@@ -8,6 +8,7 @@ from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import parse_qs
 
 from pfp.application.register_investment import RegisterInvestment, RegisterInvestmentRequest
 from pfp.cli import DEFAULT_INVESTMENTS_FILE, DEFAULT_SALES_FILE
@@ -61,6 +62,14 @@ class WebRuntime:
 
     portfolio: Portfolio
     price_provider: object
+    investment_repository: InvestmentRepository | None = None
+
+    def register_investment(self, request: RegisterInvestmentRequest):
+        if self.investment_repository is None:
+            raise RuntimeError("Investment repository is not configured")
+        investment = RegisterInvestment().execute(self.portfolio, request)
+        self.investment_repository.save(investment)
+        return investment
 
     def report(self) -> PortfolioReport:
         prices = self.price_provider.get_prices(list(self.portfolio.positions.keys()))
@@ -87,7 +96,7 @@ def build_web_runtime(
     investments = InvestmentRepository(investments_file).load()
     sales = SaleRepository(sales_file).load()
     portfolio = PortfolioEngine().build(movements, investments=investments, sales=sales)
-    return WebRuntime(portfolio, price_provider)
+    return WebRuntime(portfolio, price_provider, InvestmentRepository(investments_file))
 
 
 def parse_investment_request(form: dict[str, list[str]]) -> RegisterInvestmentRequest:
@@ -171,7 +180,7 @@ def serve(
                 raw = self.rfile.read(length).decode("utf-8")
                 form = parse_qs(raw, keep_blank_values=True)
                 request = parse_investment_request(form)
-                RegisterInvestment().execute(runtime.portfolio, request)
+                runtime.register_investment(request)
                 app = WebApp(runtime.report())
             except (ValueError, InvalidOperation) as exc:
                 values = {key: values[0] if values else "" for key, values in form.items()} if "form" in locals() else {}
