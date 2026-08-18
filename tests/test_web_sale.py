@@ -32,6 +32,7 @@ def portfolio_with_position():
             shares=Decimal("4"),
             amount=Decimal("400"),
             price=Decimal("100"),
+            portfolio_class="Renta Variable",
         )
     )
     return portfolio
