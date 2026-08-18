@@ -31,6 +31,7 @@ def test_register_sale_updates_portfolio_and_returns_sale():
             shares=Decimal("4"),
             amount=Decimal("400"),
             price=Decimal("100"),
+            portfolio_class="Renta Variable",
         )
     )
 
