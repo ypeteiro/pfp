@@ -22,7 +22,7 @@ def request(**overrides):
 
 
 def test_register_sale_updates_portfolio_and_returns_sale():
-    portfolio = Portfolio(cash=Decimal("100"))
+    portfolio = Portfolio(cash=Decimal("400"))
     from pfp.domain.investment import Investment
     portfolio.add_investment(
         Investment(
@@ -38,7 +38,7 @@ def test_register_sale_updates_portfolio_and_returns_sale():
     sale = RegisterSale().execute(portfolio, request())
 
     assert sale.symbol == "VWCE"
-    assert portfolio.cash == Decimal("400")
+    assert portfolio.cash == Decimal("300")
     assert portfolio.invested == Decimal("200")
     assert portfolio.positions["VWCE"].shares == Decimal("2")
     assert portfolio.realized_gain_loss == Decimal("100")
