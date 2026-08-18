@@ -53,12 +53,16 @@ class SaleRepository:
                 row["operation_id"] = row.get("operation_id") or ""
                 writer.writerow({field: row.get(field, "") for field in self.FIELDNAMES})
 
+    def exists_by_operation_id(self, operation_id: str) -> bool:
+        if not operation_id or not operation_id.strip():
+            return False
+        return any(existing.operation_id == operation_id for existing in self.load())
+
     def save(self, sale):
         self.path.parent.mkdir(parents=True, exist_ok=True)
 
-        if sale.operation_id is not None:
-            if any(existing.operation_id == sale.operation_id for existing in self.load()):
-                return
+        if sale.operation_id is not None and self.exists_by_operation_id(sale.operation_id):
+            return
 
         file_exists = self.path.exists()
         if file_exists:
