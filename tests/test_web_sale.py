@@ -23,7 +23,7 @@ def form(**overrides):
 
 
 def portfolio_with_position():
-    portfolio = Portfolio(cash=Decimal("100"))
+    portfolio = Portfolio(cash=Decimal("400"))
     from datetime import datetime, timezone
     portfolio.add_investment(
         Investment(
@@ -70,7 +70,7 @@ def test_web_runtime_persists_registered_sale(tmp_path):
     sale = runtime.register_sale(parse_sale_request(form()))
 
     assert repository.load() == [sale]
-    assert runtime.portfolio.cash == Decimal("400")
+    assert runtime.portfolio.cash == Decimal("300")
     assert runtime.portfolio.invested == Decimal("200")
 
 
