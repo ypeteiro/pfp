@@ -14,6 +14,7 @@ def test_dashboard_v2_shows_strategy_and_main_metrics():
     html = dashboard_v2_html(report)
     assert "Tu patrimonio" in html
     assert "75 / 20 / 5" in html
+    assert "allocation-panel-heading" in html
     assert "70,00%" in html
     assert "Aumentar" in html
     assert "1.200,00 €" in html
