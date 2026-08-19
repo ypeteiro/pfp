@@ -31,8 +31,11 @@ class PortfolioEngine:
             key = account_key(movement)
             if movement.type in {"TRANSFER_INSTANT_INBOUND", "TRANSFER_INBOUND"}:
                 account_cash[key] += movement.amount
+                portfolio.cash += movement.amount
             elif movement.type in {"TRANSFER_INSTANT_OUTBOUND", "TRANSFER_OUTBOUND"}:
-                account_cash[key] -= abs(movement.amount)
+                amount = abs(movement.amount)
+                account_cash[key] -= amount
+                portfolio.cash -= amount
             elif movement.type == "BUY":
                 if movement.symbol is None or movement.shares is None or movement.price is None:
                     continue
