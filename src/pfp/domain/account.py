@@ -16,3 +16,8 @@ class Account:
             raise ValueError("Account broker cannot be empty")
         if len(self.currency) != 3 or not self.currency.isalpha() or self.currency != self.currency.upper():
             raise ValueError("Currency must be a three-letter uppercase code")
+
+    @property
+    def id(self) -> str:
+        """Stable account identity within a portfolio."""
+        return self.name
