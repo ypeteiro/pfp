@@ -4,6 +4,7 @@ from decimal import Decimal
 import pytest
 
 from pfp.domain.account import Account
+from pfp.domain.account_opening_balance import AccountOpeningBalance
 from pfp.domain.account_transfer import AccountTransfer
 from pfp.domain.capital_flow import CapitalFlow, FlowType
 from pfp.domain.investment import Investment
@@ -60,7 +61,7 @@ def test_account_transfer_validates_basic_invariants():
 
 def test_portfolio_engine_moves_cash_between_accounts_without_changing_total_cash():
     opening_balances = [
-        __import__("pfp.domain.account_opening_balance", fromlist=["AccountOpeningBalance"]).AccountOpeningBalance(
+        AccountOpeningBalance(
             account_id="abanca_nomina",
             date=WHEN.date(),
             amount=Decimal("1000"),
@@ -92,7 +93,7 @@ def test_portfolio_engine_moves_cash_between_accounts_without_changing_total_cas
 
 def test_portfolio_engine_rejects_transfer_exceeding_source_cash():
     opening_balances = [
-        __import__("pfp.domain.account_opening_balance", fromlist=["AccountOpeningBalance"]).AccountOpeningBalance(
+        AccountOpeningBalance(
             account_id="abanca_nomina",
             date=WHEN.date(),
             amount=Decimal("500"),
