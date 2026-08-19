@@ -7,7 +7,7 @@ from pfp.importers.trade_republic import TradeRepublicImporter
 from pfp.importers.validation import ImportValidationError
 
 
-CSV_FILE = Path("data/imports/trade_republic.csv")
+CSV_FILE = Path("tests/fixtures/trade_republic.csv")
 
 
 def test_valid_trade_republic_file_passes_import_validation():

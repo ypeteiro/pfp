@@ -4,7 +4,7 @@ from pathlib import Path
 from pfp.cli import load_portfolio, run_rebalance
 
 
-MOVEMENTS_FILE = Path("data/imports/trade_republic.csv")
+MOVEMENTS_FILE = Path("tests/fixtures/trade_republic.csv")
 
 
 def _price_provider():

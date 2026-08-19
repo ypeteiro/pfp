@@ -4,7 +4,7 @@ from pfp.importers.report import ImportReport
 from pfp.importers.trade_republic import TradeRepublicImporter
 
 
-CSV_FILE = Path("data/imports/trade_republic.csv")
+CSV_FILE = Path("tests/fixtures/trade_republic.csv")
 
 
 def test_trade_republic_import_report_is_structured():

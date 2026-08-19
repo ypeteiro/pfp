@@ -11,7 +11,7 @@ from pfp.domain.portfolio import Portfolio
 from pfp.domain.position import Position
 from pfp.domain.sale import Sale
 
-CSV_FILE = Path("data/imports/trade_republic.csv")
+CSV_FILE = Path("tests/fixtures/trade_republic.csv")
 
 
 def _movement(**overrides):

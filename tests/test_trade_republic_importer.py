@@ -3,7 +3,7 @@ from pathlib import Path
 from pfp.importers.trade_republic import TradeRepublicImporter
 
 
-CSV_FILE = Path("data/imports/trade_republic.csv")
+CSV_FILE = Path("tests/fixtures/trade_republic.csv")
 
 
 def test_import_trade_republic_movements():
