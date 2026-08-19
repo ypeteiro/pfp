@@ -74,7 +74,7 @@ class PortfolioReport:
     ) -> "PortfolioReport":
         market_value = sum((position.market_value or Decimal("0") for position in portfolio.positions.values()), Decimal("0"))
         unrealized_gain_loss = sum((position.gain_loss or Decimal("0") for position in portfolio.positions.values()), Decimal("0"))
-        class_map = {"RV": "RV", "EQUITY": "RV", "RF": "RF", "FIXED_INCOME": "RF", "GOLD": "GOLD", "CRYPTO": "CRYPTO"}
+        class_map = {"RV": "RV", "EQUITY": "RV", "STOCK": "RV", "RF": "RF", "FIXED_INCOME": "RF", "GOLD": "GOLD", "CRYPTO": "CRYPTO"}
         class_values = {"RV": Decimal("0"), "RF": Decimal("0"), "GOLD": Decimal("0"), "CRYPTO": Decimal("0")}
         for position in portfolio.positions.values():
             normalized_class = class_map.get(position.portfolio_class)
@@ -96,10 +96,10 @@ class PortfolioReport:
                 average_price=position.average_price or (position.invested / position.shares if position.shares else Decimal("0")),
                 market_price=market_price,
                 market_value=market_value_for_position,
-                weight=(market_value_for_position / market_value if market_value else None),
+                weight=(market_value_for_position / market_value if market_value and market_value_for_position is not None else None),
                 gain_loss=gain_loss,
-                isin=asset.isin if asset else (position.symbol if position.symbol.upper().startswith("IE") else None),
-                ticker=asset.ticker if asset else (position.symbol if not position.symbol.upper().startswith("IE") else None),
+                isin=asset.isin if asset else (position.symbol if position.symbol.upper().startswith(("IE", "US")) else None),
+                ticker=asset.ticker if asset else (position.symbol if not position.symbol.upper().startswith(("IE", "US")) else None),
             ))
 
         accounts = tuple(AccountReport(a.name, a.broker, a.currency, a.balance) for a in sorted(portfolio.accounts, key=lambda item: (item.broker, item.name)))
