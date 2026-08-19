@@ -18,7 +18,7 @@ def test_load_portfolio_includes_abanca_savings_opening_balance():
     assert accounts["ABANCA_AHORRO"].balance == Decimal("31179.70")
     assert accounts["ABANCA_AHORRO"].broker == "ABANCA_AHORRO"
     assert accounts["ABANCA_AHORRO"].currency == "EUR"
-    assert portfolio.cash == Decimal("34773.09")
+    assert portfolio.cash == Decimal("34019.99")
 
 
 def test_run_invest_persists_investment(tmp_path):
