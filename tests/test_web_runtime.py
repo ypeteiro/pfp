@@ -72,7 +72,9 @@ def test_web_runtime_supports_new_asset_buy_and_partial_sale(tmp_path):
     assert portfolio.cash == Decimal("750")
     assert portfolio.invested == Decimal("300")
     assert portfolio.realized_gain_loss == Decimal("50")
-    assert portfolio.unrealized_gain_loss == Decimal("60")
+
+    report = runtime.report()
+    assert report.unrealized_gain_loss == Decimal("60")
 
     persisted_assets = asset_repository.load()
     persisted_investments = investment_repository.load()
