@@ -27,11 +27,23 @@ class PortfolioEngine:
                 if movement.symbol is None or movement.shares is None or movement.price is None:
                     continue
                 asset = AssetCatalog.get_or_create(movement.symbol, movement.name, movement.asset_class)
-                self._apply_buy(portfolio, movement.symbol, asset.name, movement.shares, abs(movement.amount), asset.portfolio_class)
+                self._apply_buy(
+                    portfolio,
+                    movement.symbol,
+                    asset.name,
+                    movement.shares,
+                    abs(movement.amount) + abs(movement.fee) + abs(movement.tax),
+                    asset.portfolio_class,
+                )
             elif movement.type == "SELL":
                 if movement.symbol is None or movement.shares is None or movement.amount is None:
                     continue
-                self._apply_sell(portfolio, movement.symbol, movement.shares, movement.amount)
+                self._apply_sell(
+                    portfolio,
+                    movement.symbol,
+                    movement.shares,
+                    movement.amount + movement.fee + movement.tax,
+                )
         if investments is not None:
             for investment in investments:
                 self._apply_buy(
