@@ -29,7 +29,7 @@ class TradeRepublicImporter(Importer):
                     datetime=datetime.fromisoformat(row["datetime"].replace("Z", "+00:00")),
                     date=datetime.strptime(row["date"], "%Y-%m-%d"),
                     account_type=row["account_type"], broker="Trade Republic",
-                    category=row["category"], type=row["type"], asset_class=row["asset_class"],
+                    category=row["category"], type=row["type"], asset_class=None if pd.isna(row["asset_class"]) else row["asset_class"],
                     name=row["name"], symbol=None if pd.isna(row["symbol"]) else row["symbol"],
                     shares=None if pd.isna(row["shares"]) else Decimal(str(row["shares"])),
                     price=None if pd.isna(row["price"]) else Decimal(str(row["price"])),
