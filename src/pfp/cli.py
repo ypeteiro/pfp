@@ -12,6 +12,7 @@ from pfp.engine.investment_engine import InvestmentEngine
 from pfp.engine.portfolio_engine import PortfolioEngine
 from pfp.engine.rebalance_engine import RebalanceEngine
 from pfp.engine.recommendation_engine import RecommendationEngine
+from pfp.importers.account_opening_balance_repository import AccountOpeningBalanceRepository
 from pfp.importers.investment_repository import InvestmentRepository
 from pfp.importers.sale_repository import SaleRepository
 from pfp.importers.snapshot_repository import SnapshotRepository
@@ -21,6 +22,7 @@ from pfp.market.price_provider import CompositePriceProvider
 DEFAULT_INVESTMENTS_FILE = "data/imports/investments.csv"
 DEFAULT_SALES_FILE = "data/imports/sales.csv"
 DEFAULT_SNAPSHOTS_FILE = "data/imports/snapshots.csv"
+DEFAULT_OPENING_BALANCES_FILE = "data/accounts/opening_balances.csv"
 
 
 def build_parser():
@@ -69,11 +71,12 @@ def build_parser():
     return parser
 
 
-def load_portfolio(movements_file, investments_file=None, sales_file=None):
+def load_portfolio(movements_file, investments_file=None, sales_file=None, opening_balances_file=DEFAULT_OPENING_BALANCES_FILE):
     movements = TradeRepublicImporter().load(movements_file)
     investments = InvestmentRepository(investments_file).load() if investments_file is not None else None
     sales = SaleRepository(sales_file).load() if sales_file is not None else None
-    return PortfolioEngine().build(movements, investments=investments, sales=sales)
+    opening_balances = AccountOpeningBalanceRepository(opening_balances_file).load()
+    return PortfolioEngine().build(movements, investments=investments, sales=sales, opening_balances=opening_balances)
 
 
 def run_import_tr(csv_file):
@@ -87,9 +90,10 @@ def run_portfolio(movements_file):
     movements = importer.load(movements_file)
     investments = InvestmentRepository(DEFAULT_INVESTMENTS_FILE).load()
     sales = SaleRepository(DEFAULT_SALES_FILE).load()
-    portfolio = portfolio_engine.build(movements, investments=investments, sales=sales)
+    opening_balances = AccountOpeningBalanceRepository(DEFAULT_OPENING_BALANCES_FILE).load()
+    portfolio = portfolio_engine.build(movements, investments=investments, sales=sales, opening_balances=opening_balances)
     prices = price_provider.get_prices(list(portfolio.positions.keys()))
-    portfolio = portfolio_engine.build(movements, prices, investments=investments, sales=sales)
+    portfolio = portfolio_engine.build(movements, prices, investments=investments, sales=sales, opening_balances=opening_balances)
     print_portfolio(portfolio)
 
 
@@ -98,10 +102,11 @@ def run_snapshot(movements_file, snapshots_file=DEFAULT_SNAPSHOTS_FILE, investme
     movements = TradeRepublicImporter().load(movements_file)
     investments = InvestmentRepository(investments_file).load()
     sales = SaleRepository(sales_file).load()
+    opening_balances = AccountOpeningBalanceRepository(DEFAULT_OPENING_BALANCES_FILE).load()
     engine = PortfolioEngine()
-    portfolio = engine.build(movements, investments=investments, sales=sales)
+    portfolio = engine.build(movements, investments=investments, sales=sales, opening_balances=opening_balances)
     prices = price_provider.get_prices(list(portfolio.positions.keys()))
-    portfolio = engine.build(movements, prices, investments=investments, sales=sales)
+    portfolio = engine.build(movements, prices, investments=investments, sales=sales, opening_balances=opening_balances)
     market_value = sum((position.market_value or Decimal("0")) for position in portfolio.positions.values())
     unrealized = sum((position.gain_loss or Decimal("0")) for position in portfolio.positions.values())
     class_values = {"EQUITY": Decimal("0"), "FIXED_INCOME": Decimal("0"), "GOLD": Decimal("0"), "CRYPTO": Decimal("0")}
@@ -162,7 +167,8 @@ def _build_rebalance(movements_file, investments_file, sales_file, price_provide
     movements = TradeRepublicImporter().load(movements_file)
     investments = InvestmentRepository(investments_file).load()
     sales = SaleRepository(sales_file).load()
-    portfolio = PortfolioEngine().build(movements, prices, investments=investments, sales=sales)
+    opening_balances = AccountOpeningBalanceRepository(DEFAULT_OPENING_BALANCES_FILE).load()
+    portfolio = PortfolioEngine().build(movements, prices, investments=investments, sales=sales, opening_balances=opening_balances)
     return RebalanceEngine().rebalance(portfolio)
 
 
