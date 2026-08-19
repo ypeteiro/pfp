@@ -42,6 +42,35 @@ def _movement(*, asset_class="STOCK", symbol="US55024U1097", name="Lumentum Hold
     )
 
 
+def _cash_movement(amount=Decimal("200")):
+    return Movement(
+        datetime=datetime(2026, 8, 17, 10, 29, tzinfo=timezone.utc),
+        date=date(2026, 8, 17),
+        account_type="DEFAULT",
+        broker="Trade Republic",
+        category="CASH",
+        type="TRANSFER_INSTANT_INBOUND",
+        asset_class=None,
+        name=None,
+        symbol=None,
+        shares=None,
+        price=None,
+        amount=amount,
+        fee=Decimal("0"),
+        tax=Decimal("0"),
+        currency="EUR",
+        original_amount=None,
+        original_currency=None,
+        fx_rate=None,
+        description=None,
+        transaction_id="cash-test",
+        counterparty_name=None,
+        counterparty_iban=None,
+        payment_reference=None,
+        mcc_code=None,
+    )
+
+
 def test_asset_catalog_knows_new_stocks():
     lumentum = AssetCatalog.get("US55024U1097")
     ciena = AssetCatalog.get("US1717793095")
@@ -60,7 +89,7 @@ def test_asset_catalog_preserves_imported_class_for_unknown_asset():
 
 def test_portfolio_engine_uses_stock_class_from_trade_republic():
     portfolio = Portfolio(cash=Decimal("200"))
-    portfolio = PortfolioEngine().build([_movement()], prices={"US55024U1097": Decimal("120")})
+    portfolio = PortfolioEngine().build([_cash_movement(), _movement()], prices={"US55024U1097": Decimal("120")})
     position = portfolio.positions["US55024U1097"]
     assert position.portfolio_class == "STOCK"
     assert position.market_price == Decimal("120")
@@ -70,7 +99,7 @@ def test_portfolio_engine_uses_stock_class_from_trade_republic():
 def test_portfolio_report_normalizes_stock_to_equity_and_handles_missing_price():
     portfolio = Portfolio(
         cash=Decimal("100"),
-        invested=Decimal("100"),
+        invested=Decimal("150"),
         positions={
             "US55024U1097": Position("US55024U1097", "Lumentum Holdings", Decimal("1"), Decimal("100"), Decimal("100"), "STOCK"),
             "UNKNOWN": Position("UNKNOWN", "Unknown", Decimal("1"), Decimal("50"), Decimal("50"), "STOCK"),
