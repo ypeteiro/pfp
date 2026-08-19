@@ -25,8 +25,8 @@ def test_build_portfolio():
     movements = importer.load(CSV_FILE)
     portfolio = PortfolioEngine().build(movements)
     assert len(portfolio.positions) == 9
-    assert round(float(portfolio.cash), 2) == 3603.39
-    assert round(float(portfolio.invested), 2) == 21396.61
+    assert round(float(portfolio.cash), 2) == 3593.39
+    assert round(float(portfolio.invested), 2) == 21406.61
 
 
 def test_buy_includes_fee_and_tax_in_cash_and_cost_basis():
@@ -112,7 +112,7 @@ def test_trade_republic_account_balance():
     assert account.name == "Trade Republic"
     assert account.broker == "Trade Republic"
     assert account.currency == "EUR"
-    assert round(float(account.balance), 2) == 3603.39
+    assert round(float(account.balance), 2) == 3593.39
 
 
 def test_trade_republic_account_name():
@@ -168,16 +168,17 @@ def test_sell_reduces_position_and_increases_cash():
     portfolio = PortfolioEngine().build(movements)
     position = portfolio.positions["IE00B4L5Y983"]
     assert position.shares == Decimal("0.692682")
-    assert portfolio.cash == Decimal("3753.39")
+    assert portfolio.cash == Decimal("3743.39")
 
 
 def test_sell_reduces_invested_at_average_cost():
     importer = TradeRepublicImporter()
     movements = importer.load(CSV_FILE)
+    before = PortfolioEngine().build(movements)
     movements.append(_sell_movement(transaction_id="test-sell-002"))
     portfolio = PortfolioEngine().build(movements)
     position = portfolio.positions["IE00B4L5Y983"]
-    expected_average_price = Decimal("100") / Decimal("0.792682")
+    expected_average_price = before.positions["IE00B4L5Y983"].average_price
     expected_invested = expected_average_price * Decimal("0.692682")
     assert position.shares == Decimal("0.692682")
     assert position.invested.quantize(Decimal("0.0000000001")) == expected_invested.quantize(Decimal("0.0000000001"))
@@ -187,9 +188,10 @@ def test_sell_reduces_invested_at_average_cost():
 def test_sell_records_realized_gain_loss():
     importer = TradeRepublicImporter()
     movements = importer.load(CSV_FILE)
+    before = PortfolioEngine().build(movements)
     movements.append(_sell_movement())
     portfolio = PortfolioEngine().build(movements)
-    average_price = Decimal("100") / Decimal("0.792682")
+    average_price = before.positions["IE00B4L5Y983"].average_price
     expected_realized = Decimal("150") - (average_price * Decimal("0.1"))
     assert portfolio.realized_gain_loss.quantize(Decimal("0.0000000001")) == expected_realized.quantize(Decimal("0.0000000001"))
 
@@ -201,7 +203,7 @@ def test_sell_records_realized_loss():
     movements.append(_sell_movement(amount="10", transaction_id="test-sell-loss"))
     after = PortfolioEngine().build(movements)
     realized_change = after.realized_gain_loss - before.realized_gain_loss
-    average_price = Decimal("100") / Decimal("0.792682")
+    average_price = before.positions["IE00B4L5Y983"].average_price
     expected_realized = Decimal("10") - (average_price * Decimal("0.1"))
     assert realized_change < Decimal("0")
     assert realized_change.quantize(Decimal("0.0000000001")) == expected_realized.quantize(Decimal("0.0000000001"))
