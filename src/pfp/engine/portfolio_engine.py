@@ -14,26 +14,17 @@ class PortfolioEngine:
         accounts = {}
         account_cash = {}
 
-        def ensure_account(account_id, broker, currency):
-            if account_id not in accounts:
-                accounts[account_id] = Account(
-                    name=account_id,
-                    broker=broker,
-                    currency=currency,
-                )
-                account_cash[account_id] = Decimal("0")
-            return account_id
-
         def account_key(movement):
             return movement.account_id or f"{movement.account_type}:{movement.broker}:{movement.currency}"
 
-        for opening_balance in opening_balances or []:
-            ensure_account(opening_balance.account_id, opening_balance.account_id, opening_balance.currency)
-            account_cash[opening_balance.account_id] += opening_balance.amount
+        def account_name(movement):
+            return movement.account_id or movement.broker
 
         for movement in movements:
             key = account_key(movement)
-            ensure_account(key, movement.account_id or movement.broker, movement.currency)
+            if key not in accounts:
+                accounts[key] = Account(name=account_name(movement), broker=movement.broker, currency=movement.currency)
+                account_cash[key] = Decimal("0")
 
         for movement in movements:
             key = account_key(movement)
@@ -46,53 +37,31 @@ class PortfolioEngine:
                     continue
                 asset = AssetCatalog.get_or_create(movement.symbol, movement.name, movement.asset_class)
                 cost = abs(movement.amount) + abs(movement.fee) + abs(movement.tax)
-                self._apply_buy(
-                    portfolio,
-                    movement.symbol,
-                    asset.name,
-                    movement.shares,
-                    cost,
-                    asset.portfolio_class,
-                    allow_insufficient_cash=True,
-                )
+                self._apply_buy(portfolio, movement.symbol, asset.name, movement.shares, cost, asset.portfolio_class, allow_insufficient_cash=True)
                 account_cash[key] -= cost
             elif movement.type == "SELL":
                 if movement.symbol is None or movement.shares is None or movement.amount is None:
                     continue
                 proceeds = movement.amount + movement.fee + movement.tax
-                self._apply_sell(
-                    portfolio,
-                    movement.symbol,
-                    movement.shares,
-                    proceeds,
-                )
+                self._apply_sell(portfolio, movement.symbol, movement.shares, proceeds)
                 account_cash[key] += proceeds
 
-        # Persisted rebalance operations are not part of movements, so their
-        # cash effect must be applied separately to the consolidated balance.
-        persisted_cash_delta = Decimal("0")
+        if opening_balances is not None:
+            for opening_balance in opening_balances:
+                key = opening_balance.account_id
+                if key not in accounts:
+                    accounts[key] = Account(name=key, broker=key, currency=opening_balance.currency)
+                    account_cash[key] = Decimal("0")
+                account_cash[key] += opening_balance.amount
 
+        persisted_cash_delta = Decimal("0")
         if investments is not None:
             for investment in investments:
-                self._apply_buy(
-                    portfolio,
-                    investment.symbol,
-                    investment.symbol,
-                    investment.shares,
-                    investment.amount,
-                    investment.portfolio_class,
-                    allow_insufficient_cash=True,
-                )
+                self._apply_buy(portfolio, investment.symbol, investment.symbol, investment.shares, investment.amount, investment.portfolio_class, allow_insufficient_cash=True)
                 persisted_cash_delta -= investment.amount
-
         if sales is not None:
             for sale in sales:
-                self._apply_sell(
-                    portfolio,
-                    sale.symbol,
-                    sale.shares,
-                    sale.amount,
-                )
+                self._apply_sell(portfolio, sale.symbol, sale.shares, sale.amount)
                 persisted_cash_delta += sale.amount
 
         portfolio.invested = sum(position.invested for position in portfolio.positions.values())
