@@ -14,6 +14,38 @@ from pfp.domain.sale import Sale
 CSV_FILE = Path("data/imports/trade_republic.csv")
 
 
+def _movement(**overrides):
+    values = dict(
+        datetime=datetime(2026, 8, 19, tzinfo=timezone.utc),
+        date=date(2026, 8, 19),
+        account_type="DEFAULT",
+        account_id=None,
+        broker="Test Bank",
+        category="CASH",
+        type="TRANSFER_INSTANT_INBOUND",
+        asset_class=None,
+        name=None,
+        symbol=None,
+        shares=None,
+        price=None,
+        amount=Decimal("0"),
+        fee=Decimal("0"),
+        tax=Decimal("0"),
+        currency="EUR",
+        original_amount=None,
+        original_currency=None,
+        fx_rate=None,
+        description=None,
+        transaction_id="test",
+        counterparty_name=None,
+        counterparty_iban=None,
+        payment_reference=None,
+        mcc_code=None,
+    )
+    values.update(overrides)
+    return Movement(**values)
+
+
 def test_import_trade_republic():
     importer = TradeRepublicImporter()
     movements = importer.load(CSV_FILE)
@@ -29,11 +61,61 @@ def test_build_portfolio():
     assert round(float(portfolio.invested), 2) == 21406.61
 
 
+def test_build_consolidates_cash_across_multiple_accounts():
+    movements = [
+        _movement(account_id="ABANCA_NOMINA", amount=Decimal("1000")),
+        _movement(account_id="TRADE_REPUBLIC", broker="Trade Republic", amount=Decimal("2000")),
+    ]
+    portfolio = PortfolioEngine().build(movements)
+    balances = {account.name: account.balance for account in portfolio.accounts}
+    assert balances == {
+        "ABANCA_NOMINA": Decimal("1000"),
+        "TRADE_REPUBLIC": Decimal("2000"),
+    }
+    assert portfolio.cash == Decimal("3000")
+
+
+def test_build_supports_account_without_investments():
+    movements = [
+        _movement(account_id="ABANCA_NOMINA", amount=Decimal("31000")),
+        _movement(account_id="TRADE_REPUBLIC", broker="Trade Republic", amount=Decimal("1000")),
+    ]
+    portfolio = PortfolioEngine().build(movements)
+    abanca = next(account for account in portfolio.accounts if account.name == "ABANCA_NOMINA")
+    assert abanca.balance == Decimal("31000")
+    assert portfolio.positions == {}
+    assert portfolio.cash == Decimal("32000")
+
+
+def test_build_transfer_between_accounts_is_cash_neutral():
+    movements = [
+        _movement(account_id="ABANCA", amount=Decimal("1000")),
+        _movement(account_id="TR", broker="Trade Republic", amount=Decimal("500")),
+        _movement(account_id="ABANCA", type="TRANSFER_OUTBOUND", amount=Decimal("800")),
+        _movement(account_id="TR", broker="Trade Republic", type="TRANSFER_INBOUND", amount=Decimal("800")),
+    ]
+    portfolio = PortfolioEngine().build(movements)
+    balances = {account.name: account.balance for account in portfolio.accounts}
+    assert balances == {"ABANCA": Decimal("200"), "TR": Decimal("1300")}
+    assert portfolio.cash == Decimal("1500")
+
+
+def test_build_external_inflow_increases_consolidated_cash():
+    portfolio = PortfolioEngine().build([_movement(account_id="ABANCA", amount=Decimal("1000"))])
+    assert portfolio.cash == Decimal("1000")
+
+
+def test_build_external_outflow_reduces_consolidated_cash():
+    portfolio = PortfolioEngine().build([
+        _movement(account_id="ABANCA", amount=Decimal("1000")),
+        _movement(account_id="ABANCA", type="TRANSFER_OUTBOUND", amount=Decimal("300")),
+    ])
+    assert portfolio.cash == Decimal("700")
+
+
 def test_buy_includes_fee_and_tax_in_cash_and_cost_basis():
-    movement = Movement(
-        datetime=datetime(2026, 8, 19, tzinfo=timezone.utc),
-        date=date(2026, 8, 19),
-        account_type="DEFAULT",
+    movement = _movement(
+        account_id="TR",
         broker="Trade Republic",
         category="TRADING",
         type="BUY",
@@ -45,48 +127,9 @@ def test_buy_includes_fee_and_tax_in_cash_and_cost_basis():
         amount=Decimal("-100"),
         fee=Decimal("-1"),
         tax=Decimal("-0.50"),
-        currency="EUR",
-        original_amount=None,
-        original_currency=None,
-        fx_rate=None,
-        description="Test buy",
         transaction_id="test-buy-fee",
-        counterparty_name=None,
-        counterparty_iban=None,
-        payment_reference=None,
-        mcc_code=None,
     )
-    portfolio = PortfolioEngine().build(
-        [
-            Movement(
-                datetime=datetime(2026, 8, 19, tzinfo=timezone.utc),
-                date=date(2026, 8, 19),
-                account_type="DEFAULT",
-                broker="Trade Republic",
-                category="CASH",
-                type="TRANSFER_INSTANT_INBOUND",
-                asset_class=None,
-                name=None,
-                symbol=None,
-                shares=None,
-                price=None,
-                amount=Decimal("200"),
-                fee=Decimal("0"),
-                tax=Decimal("0"),
-                currency="EUR",
-                original_amount=None,
-                original_currency=None,
-                fx_rate=None,
-                description=None,
-                transaction_id="test-cash-fee",
-                counterparty_name=None,
-                counterparty_iban=None,
-                payment_reference=None,
-                mcc_code=None,
-            ),
-            movement,
-        ]
-    )
+    portfolio = PortfolioEngine().build([_movement(account_id="TR", broker="Trade Republic", amount=Decimal("200")), movement])
     position = portfolio.positions["TEST"]
     assert portfolio.cash == Decimal("98.50")
     assert position.invested == Decimal("101.50")
@@ -117,7 +160,7 @@ def test_trade_republic_account_balance():
 
 def test_trade_republic_account_name():
     importer = TradeRepublicImporter()
-    movements = importer.load(CSV_FILE)
+    movements = TradeRepublicImporter().load(CSV_FILE)
     portfolio = PortfolioEngine().build(movements)
     account = portfolio.accounts[0]
     assert account.name == "Trade Republic"
@@ -137,6 +180,7 @@ def _sell_movement(shares="0.1", amount="150", transaction_id="test-sell"):
         datetime=datetime(2026, 8, 1, tzinfo=timezone.utc),
         date=date(2026, 8, 1),
         account_type="DEFAULT",
+        account_id=None,
         broker="Trade Republic",
         category="CASH",
         type="SELL",
@@ -230,10 +274,7 @@ def test_build_applies_persisted_sale_once():
         amount=Decimal("150"),
         price=Decimal("1500"),
     )
-    portfolio = PortfolioEngine().build(
-        TradeRepublicImporter().load(CSV_FILE),
-        sales=[sale],
-    )
+    portfolio = PortfolioEngine().build(TradeRepublicImporter().load(CSV_FILE), sales=[sale])
     position = portfolio.positions["IE00B4L5Y983"]
     assert position.shares == base.positions["IE00B4L5Y983"].shares - Decimal("0.1")
     assert portfolio.cash == base.cash + Decimal("150")
