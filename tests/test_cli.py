@@ -10,6 +10,17 @@ from pfp.importers.sale_repository import SaleRepository
 MOVEMENTS_FILE = Path("data/imports/trade_republic.csv")
 
 
+def test_load_portfolio_includes_abanca_savings_opening_balance():
+    portfolio = load_portfolio(MOVEMENTS_FILE)
+
+    accounts = {account.account_id: account for account in portfolio.accounts}
+
+    assert accounts["ABANCA_AHORRO"].balance == Decimal("31179.70")
+    assert accounts["ABANCA_AHORRO"].broker == "ABANCA_AHORRO"
+    assert accounts["ABANCA_AHORRO"].currency == "EUR"
+    assert portfolio.cash == Decimal("34773.09")
+
+
 def test_run_invest_persists_investment(tmp_path):
     investments_file = tmp_path / "investments.csv"
 
@@ -96,7 +107,6 @@ def test_run_invest_order_rejects_unknown_symbol(tmp_path):
             amount=Decimal("100"),
             movements_file=MOVEMENTS_FILE,
             investments_file=investments_file,
-            price_provider=StubPriceProvider(),
         )
     except ValueError as error:
         assert str(error) == "Symbol is not present in portfolio"
