@@ -31,11 +31,8 @@ class PortfolioEngine:
             key = account_key(movement)
             if movement.type in {"TRANSFER_INSTANT_INBOUND", "TRANSFER_INBOUND"}:
                 account_cash[key] += movement.amount
-                portfolio.cash += movement.amount
             elif movement.type in {"TRANSFER_INSTANT_OUTBOUND", "TRANSFER_OUTBOUND"}:
-                amount = abs(movement.amount)
-                account_cash[key] -= amount
-                portfolio.cash -= amount
+                account_cash[key] -= abs(movement.amount)
             elif movement.type == "BUY":
                 if movement.symbol is None or movement.shares is None or movement.price is None:
                     continue
@@ -62,6 +59,10 @@ class PortfolioEngine:
                 )
                 account_cash[key] += proceeds
 
+        # Persisted rebalance operations are not part of movements, so their
+        # cash effect must be applied separately to the consolidated balance.
+        persisted_cash_delta = Decimal("0")
+
         if investments is not None:
             for investment in investments:
                 self._apply_buy(
@@ -73,6 +74,7 @@ class PortfolioEngine:
                     investment.portfolio_class,
                     allow_insufficient_cash=True,
                 )
+                persisted_cash_delta -= investment.amount
 
         if sales is not None:
             for sale in sales:
@@ -82,6 +84,7 @@ class PortfolioEngine:
                     sale.shares,
                     sale.amount,
                 )
+                persisted_cash_delta += sale.amount
 
         portfolio.invested = sum(position.invested for position in portfolio.positions.values())
         for position in portfolio.positions.values():
@@ -96,7 +99,7 @@ class PortfolioEngine:
         for key, account in accounts.items():
             account.balance = account_cash[key]
         portfolio.accounts = list(accounts.values())
-        portfolio.cash = sum(account_cash.values(), Decimal("0"))
+        portfolio.cash = sum(account_cash.values(), Decimal("0")) + persisted_cash_delta
         return portfolio
 
     def apply_investment(self, portfolio, investment):
