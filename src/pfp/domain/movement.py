@@ -29,3 +29,4 @@ class Movement:
     counterparty_iban: str | None
     payment_reference: str | None
     mcc_code: str | None
+    account_id: str | None = None
