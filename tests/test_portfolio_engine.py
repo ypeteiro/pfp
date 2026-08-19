@@ -29,6 +29,70 @@ def test_build_portfolio():
     assert round(float(portfolio.invested), 2) == 21396.61
 
 
+def test_buy_includes_fee_and_tax_in_cash_and_cost_basis():
+    movement = Movement(
+        datetime=datetime(2026, 8, 19, tzinfo=timezone.utc),
+        date=date(2026, 8, 19),
+        account_type="DEFAULT",
+        broker="Trade Republic",
+        category="TRADING",
+        type="BUY",
+        asset_class="ETF",
+        name="Test ETF",
+        symbol="TEST",
+        shares=Decimal("2"),
+        price=Decimal("50"),
+        amount=Decimal("-100"),
+        fee=Decimal("-1"),
+        tax=Decimal("-0.50"),
+        currency="EUR",
+        original_amount=None,
+        original_currency=None,
+        fx_rate=None,
+        description="Test buy",
+        transaction_id="test-buy-fee",
+        counterparty_name=None,
+        counterparty_iban=None,
+        payment_reference=None,
+        mcc_code=None,
+    )
+    portfolio = PortfolioEngine().build(
+        [
+            Movement(
+                datetime=datetime(2026, 8, 19, tzinfo=timezone.utc),
+                date=date(2026, 8, 19),
+                account_type="DEFAULT",
+                broker="Trade Republic",
+                category="CASH",
+                type="TRANSFER_INSTANT_INBOUND",
+                asset_class=None,
+                name=None,
+                symbol=None,
+                shares=None,
+                price=None,
+                amount=Decimal("200"),
+                fee=Decimal("0"),
+                tax=Decimal("0"),
+                currency="EUR",
+                original_amount=None,
+                original_currency=None,
+                fx_rate=None,
+                description=None,
+                transaction_id="test-cash-fee",
+                counterparty_name=None,
+                counterparty_iban=None,
+                payment_reference=None,
+                mcc_code=None,
+            ),
+            movement,
+        ]
+    )
+    position = portfolio.positions["TEST"]
+    assert portfolio.cash == Decimal("98.50")
+    assert position.invested == Decimal("101.50")
+    assert position.average_price == Decimal("50.75")
+
+
 def test_portfolio_creates_account_from_movements():
     importer = TradeRepublicImporter()
     movements = importer.load(CSV_FILE)
