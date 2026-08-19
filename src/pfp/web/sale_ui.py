@@ -1,15 +1,16 @@
 from html import escape
 
 
-def sale_form_html(error: str | None = None, values: dict[str, str] | None = None) -> str:
+def sale_form_html(error: str | None = None, values: dict[str, str] | None = None, assets=()) -> str:
     values = values or {}
     error_html = f'<div class="form-error" role="alert">{escape(error)}</div>' if error else ""
+    asset_options = "".join(f'<option value="{escape(asset.symbol, quote=True)}">{escape(asset.name)}</option>' for asset in assets)
     return f'''<h1>Registrar venta</h1>
-<p class="muted">Registra una venta en el portfolio actual. La posición y el efectivo se actualizan al registrar la operación.</p>
+<p class="muted">Registra una venta en el portfolio actual. El campo Activo usa el catálogo configurado en PFP.</p>
 <section class="panel investment-form-panel">{error_html}
 <form class="investment-form" method="post" action="/sales">
 <label>Fecha y hora<input required type="datetime-local" name="datetime" value="{value(values, "datetime")}"></label>
-<label>Activo<input required type="text" name="symbol" value="{value(values, "symbol")}" placeholder="VWCE" autocomplete="off"></label>
+<label>Activo<input required type="text" name="symbol" value="{value(values, "symbol")}" placeholder="VWCE" autocomplete="off" list="sale-asset-options"><datalist id="sale-asset-options">{asset_options}</datalist></label>
 <label>Participaciones<input required type="number" name="shares" value="{value(values, "shares")}" min="0" step="any"></label>
 <label>Precio<input required type="number" name="price" value="{value(values, "price")}" min="0" step="any"></label>
 <label>Importe<input required type="number" name="amount" value="{value(values, "amount")}" min="0" step="any"></label>
