@@ -65,11 +65,7 @@ class RebalanceEngine:
             position_value = position.market_value
             market_value += position_value
 
-            portfolio_class = getattr(
-                position,
-                "portfolio_class",
-                None,
-            )
+            portfolio_class = getattr(position, "portfolio_class", None)
             if portfolio_class not in class_values:
                 continue
 
@@ -85,6 +81,7 @@ class RebalanceEngine:
 
         allocations = []
         orders = []
+        tolerance = Decimal("0.01")
 
         for portfolio_class, target_percent in self.target_allocation.items():
             current_value = class_values[portfolio_class]
@@ -110,7 +107,7 @@ class RebalanceEngine:
             )
 
             positions = positions_by_class[portfolio_class]
-            if not positions or difference_value == 0:
+            if not positions or abs(difference_value) < tolerance:
                 continue
 
             selected_position = max(
