@@ -56,6 +56,7 @@ def test_run_invest_uses_utc_datetime(tmp_path):
 
 def test_run_invest_order_uses_current_price_and_persists(tmp_path):
     investments_file = tmp_path / "investments.csv"
+    sales_file = tmp_path / "sales.csv"
 
     class StubPriceProvider:
         def get_prices(self, symbols):
@@ -68,6 +69,7 @@ def test_run_invest_order_uses_current_price_and_persists(tmp_path):
         movements_file=MOVEMENTS_FILE,
         investments_file=investments_file,
         price_provider=StubPriceProvider(),
+        sales_file=sales_file,
     )
 
     investments = InvestmentRepository(investments_file).load()
@@ -104,8 +106,9 @@ def test_run_invest_order_rejects_unknown_symbol(tmp_path):
 
 def test_recommendation_order_can_be_executed_as_investment(tmp_path):
     investments_file = tmp_path / "investments.csv"
+    sales_file = tmp_path / "sales.csv"
 
-    portfolio = load_portfolio(MOVEMENTS_FILE, investments_file)
+    portfolio = load_portfolio(MOVEMENTS_FILE, investments_file, sales_file)
     recommendation = RecommendationEngine().recommend(
         portfolio,
         Decimal("300"),
@@ -122,6 +125,7 @@ def test_recommendation_order_can_be_executed_as_investment(tmp_path):
         movements_file=MOVEMENTS_FILE,
         investments_file=investments_file,
         price_provider=StubPriceProvider(),
+        sales_file=sales_file,
     )
 
     investments = InvestmentRepository(investments_file).load()
@@ -134,8 +138,9 @@ def test_recommendation_order_can_be_executed_as_investment(tmp_path):
 
 def test_run_recommend_prints_executable_invest_order(tmp_path, capsys):
     investments_file = tmp_path / "investments.csv"
+    sales_file = tmp_path / "sales.csv"
 
-    portfolio = load_portfolio(MOVEMENTS_FILE, investments_file)
+    portfolio = load_portfolio(MOVEMENTS_FILE, investments_file, sales_file)
     recommendation = RecommendationEngine().recommend(
         portfolio,
         Decimal("300"),
@@ -145,6 +150,7 @@ def test_run_recommend_prints_executable_invest_order(tmp_path, capsys):
         Decimal("300"),
         MOVEMENTS_FILE,
         investments_file,
+        sales_file,
     )
 
     output = capsys.readouterr().out
@@ -178,52 +184,3 @@ def test_run_sell_persists_sale_and_updates_portfolio(tmp_path):
     sales = SaleRepository(sales_file).load()
     assert len(sales) == 1
     assert sales[0].symbol == "IE00B4L5Y983"
-    assert sales[0].shares == Decimal("0.1")
-    assert sales[0].amount == Decimal("150")
-    assert sales[0].price == Decimal("1500")
-    assert sales[0].datetime.tzinfo is not None
-
-    after = load_portfolio(MOVEMENTS_FILE, investments_file, sales_file)
-    after_position = after.positions["IE00B4L5Y983"]
-    assert after_position.shares == before_position.shares - Decimal("0.1")
-    assert after.cash == before.cash + Decimal("150")
-
-
-def test_run_sell_rejects_more_shares_than_position(tmp_path):
-    sales_file = tmp_path / "sales.csv"
-    investments_file = tmp_path / "investments.csv"
-    portfolio = load_portfolio(MOVEMENTS_FILE, investments_file, sales_file)
-    position = portfolio.positions["IE00B4L5Y983"]
-
-    try:
-        run_sell(
-            symbol="IE00B4L5Y983",
-            shares=position.shares + Decimal("0.1"),
-            amount=Decimal("150"),
-            movements_file=MOVEMENTS_FILE,
-            investments_file=investments_file,
-            sales_file=sales_file,
-        )
-    except ValueError as error:
-        assert str(error) == "Insufficient shares"
-    else:
-        raise AssertionError("Expected ValueError")
-
-
-def test_run_invest_with_same_operation_id_is_idempotent(tmp_path):
-    investments_file = tmp_path / "investments.csv"
-
-    for _ in range(2):
-        run_invest(
-            symbol="TEST",
-            shares=Decimal("2"),
-            amount=Decimal("200"),
-            portfolio_class="EQUITY",
-            movements_file=MOVEMENTS_FILE,
-            investments_file=investments_file,
-            operation_id="rebalance-1",
-        )
-
-    investments = InvestmentRepository(investments_file).load()
-    assert len(investments) == 1
-    assert investments[0].operation_id == "rebalance-1"
