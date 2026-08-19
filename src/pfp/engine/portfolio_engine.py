@@ -8,24 +8,32 @@ from pfp.domain.position import Position
 
 class PortfolioEngine:
 
-    def build(self, movements, prices=None, investments=None, sales=None):
+    def build(self, movements, prices=None, investments=None, sales=None, opening_balances=None):
         portfolio = Portfolio()
         portfolio.movements = movements
         accounts = {}
         account_cash = {}
 
+        def ensure_account(account_id, broker, currency):
+            if account_id not in accounts:
+                accounts[account_id] = Account(
+                    name=account_id,
+                    broker=broker,
+                    currency=currency,
+                )
+                account_cash[account_id] = Decimal("0")
+            return account_id
+
         def account_key(movement):
             return movement.account_id or f"{movement.account_type}:{movement.broker}:{movement.currency}"
 
+        for opening_balance in opening_balances or []:
+            ensure_account(opening_balance.account_id, opening_balance.account_id, opening_balance.currency)
+            account_cash[opening_balance.account_id] += opening_balance.amount
+
         for movement in movements:
             key = account_key(movement)
-            if key not in accounts:
-                accounts[key] = Account(
-                    name=movement.account_id or movement.broker,
-                    broker=movement.broker,
-                    currency=movement.currency,
-                )
-                account_cash[key] = Decimal("0")
+            ensure_account(key, movement.account_id or movement.broker, movement.currency)
 
         for movement in movements:
             key = account_key(movement)
