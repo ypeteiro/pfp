@@ -63,6 +63,20 @@ class AssetCatalog:
             portfolio_class="GOLD",
             isin="IE00B4ND3602",
         ),
+        "US55024U1097": Asset(
+            symbol="US55024U1097",
+            name="Lumentum Holdings",
+            portfolio_class="STOCK",
+            isin="US55024U1097",
+            ticker="LITE",
+        ),
+        "US1717793095": Asset(
+            symbol="US1717793095",
+            name="Ciena",
+            portfolio_class="STOCK",
+            isin="US1717793095",
+            ticker="CIEN",
+        ),
     }
 
     @classmethod
@@ -74,6 +88,7 @@ class AssetCatalog:
         cls,
         symbol: str,
         name: str | None = None,
+        portfolio_class: str | None = None,
     ) -> Asset:
         asset = cls.get(symbol)
         if asset is not None:
@@ -81,6 +96,6 @@ class AssetCatalog:
         return Asset(
             symbol=symbol,
             name=name or symbol,
-            portfolio_class="UNKNOWN",
-            isin=symbol if symbol.upper().startswith("IE") else None,
+            portfolio_class=portfolio_class or "UNKNOWN",
+            isin=symbol if symbol.upper().startswith(("IE", "US")) else None,
         )
