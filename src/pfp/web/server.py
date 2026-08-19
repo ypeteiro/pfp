@@ -13,8 +13,11 @@ from urllib.parse import parse_qs
 from pfp.application.register_investment import RegisterInvestment, RegisterInvestmentRequest
 from pfp.application.register_sale import RegisterSale, RegisterSaleRequest
 from pfp.cli import DEFAULT_INVESTMENTS_FILE, DEFAULT_SALES_FILE
+from pfp.domain.asset import Asset
+from pfp.domain.asset_catalog import AssetCatalog
 from pfp.domain.portfolio import Portfolio
 from pfp.engine.portfolio_engine import PortfolioEngine
+from pfp.importers.asset_repository import AssetRepository
 from pfp.importers.investment_repository import InvestmentRepository
 from pfp.importers.sale_repository import SaleRepository
 from pfp.importers.trade_republic import TradeRepublicImporter
@@ -22,15 +25,24 @@ from pfp.market.price_provider import CompositePriceProvider
 from pfp.reporting.portfolio_report import PortfolioReport
 from pfp.web.app import WebApp
 
+DEFAULT_ASSETS_FILE = Path("data/assets.csv")
+
 
 def dashboard_html(report: PortfolioReport) -> str:
     return WebApp(report).render("/")
 
 
-def build_web_report(movements_file: Path, investments_file: Path | None = None, sales_file: Path | None = None, price_provider=None) -> PortfolioReport:
+def _load_assets(asset_repository: AssetRepository) -> None:
+    for asset in asset_repository.load():
+        AssetCatalog.register(asset)
+
+
+def build_web_report(movements_file: Path, investments_file: Path | None = None, sales_file: Path | None = None, price_provider=None, assets_file: Path | None = None) -> PortfolioReport:
     investments_file = investments_file or Path(DEFAULT_INVESTMENTS_FILE)
     sales_file = sales_file or Path(DEFAULT_SALES_FILE)
+    assets_file = assets_file or DEFAULT_ASSETS_FILE
     price_provider = price_provider or CompositePriceProvider()
+    _load_assets(AssetRepository(assets_file))
     movements = TradeRepublicImporter().load(movements_file)
     investments = InvestmentRepository(investments_file).load()
     sales = SaleRepository(sales_file).load()
@@ -48,6 +60,7 @@ class WebRuntime:
     price_provider: object
     investment_repository: InvestmentRepository | None = None
     sale_repository: SaleRepository | None = None
+    asset_repository: AssetRepository | None = None
 
     def register_investment(self, request: RegisterInvestmentRequest):
         if self.investment_repository is None:
@@ -67,6 +80,13 @@ class WebRuntime:
         self.sale_repository.save(sale)
         return sale
 
+    def register_asset(self, asset: Asset):
+        if self.asset_repository is None:
+            raise RuntimeError("Asset repository is not configured")
+        AssetCatalog.register(asset)
+        self.asset_repository.save(asset)
+        return asset
+
     def report(self) -> PortfolioReport:
         prices = self.price_provider.get_prices(list(self.portfolio.positions.keys()))
         for symbol, position in self.portfolio.positions.items():
@@ -74,15 +94,17 @@ class WebRuntime:
         return PortfolioReport.from_portfolio(self.portfolio, price_consulted_at=datetime.now().astimezone())
 
 
-def build_web_runtime(movements_file: Path, investments_file: Path | None = None, sales_file: Path | None = None, price_provider=None) -> WebRuntime:
+def build_web_runtime(movements_file: Path, investments_file: Path | None = None, sales_file: Path | None = None, price_provider=None, assets_file: Path | None = None) -> WebRuntime:
     investments_file = investments_file or Path(DEFAULT_INVESTMENTS_FILE)
     sales_file = sales_file or Path(DEFAULT_SALES_FILE)
-    price_provider = price_provider or CompositePriceProvider()
+    assets_file = assets_file or DEFAULT_ASSETS_FILE
+    asset_repository = AssetRepository(assets_file)
+    _load_assets(asset_repository)
     movements = TradeRepublicImporter().load(movements_file)
     investments = InvestmentRepository(investments_file).load()
     sales = SaleRepository(sales_file).load()
     portfolio = PortfolioEngine().build(movements, investments=investments, sales=sales)
-    return WebRuntime(portfolio, price_provider, InvestmentRepository(investments_file), SaleRepository(sales_file))
+    return WebRuntime(portfolio, price_provider or CompositePriceProvider(), InvestmentRepository(investments_file), SaleRepository(sales_file), asset_repository)
 
 
 def _required(form: dict[str, list[str]], name: str) -> str:
@@ -115,12 +137,22 @@ def parse_sale_request(form: dict[str, list[str]]) -> RegisterSaleRequest:
     return RegisterSaleRequest(datetime=when, symbol=_required(form, "symbol"), shares=shares, amount=amount, price=price, broker=_required(form, "broker"), operation_id=(form.get("operation_id", [""])[0].strip() or None))
 
 
-def serve(movements_file: Path, host: str = "127.0.0.1", port: int = 8000, investments_file: Path | None = None, sales_file: Path | None = None, price_provider=None) -> None:
+def parse_asset_request(form: dict[str, list[str]]) -> Asset:
+    return Asset(
+        symbol=_required(form, "symbol"),
+        name=_required(form, "name"),
+        portfolio_class=_required(form, "portfolio_class"),
+        isin=(form.get("isin", [""])[0].strip() or None),
+        ticker=(form.get("ticker", [""])[0].strip() or None),
+    )
+
+
+def serve(movements_file: Path, host: str = "127.0.0.1", port: int = 8000, investments_file: Path | None = None, sales_file: Path | None = None, assets_file: Path | None = None, price_provider=None) -> None:
     def make_runtime() -> WebRuntime:
-        return build_web_runtime(movements_file, investments_file, sales_file, price_provider)
+        return build_web_runtime(movements_file, investments_file, sales_file, price_provider, assets_file)
 
     runtime = make_runtime()
-    app = WebApp(runtime.report())
+    app = WebApp(runtime.report(), AssetCatalog.all())
 
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
@@ -129,7 +161,7 @@ def serve(movements_file: Path, host: str = "127.0.0.1", port: int = 8000, inves
             if path == "/refresh":
                 try:
                     runtime = make_runtime()
-                    app = WebApp(runtime.report())
+                    app = WebApp(runtime.report(), AssetCatalog.all())
                 except Exception as exc:
                     self.send_error(500, f"No se han podido actualizar los datos: {exc}")
                     return
@@ -150,7 +182,7 @@ def serve(movements_file: Path, host: str = "127.0.0.1", port: int = 8000, inves
 
         def do_POST(self):
             nonlocal app
-            if self.path not in {"/investments", "/sales"}:
+            if self.path not in {"/investments", "/sales", "/assets"}:
                 self.send_error(404)
                 return
             form = {}
@@ -161,18 +193,22 @@ def serve(movements_file: Path, host: str = "127.0.0.1", port: int = 8000, inves
                 if self.path == "/investments":
                     request = parse_investment_request(form)
                     runtime.register_investment(request)
-                    redirect = "/positions"
-                else:
+                elif self.path == "/sales":
                     request = parse_sale_request(form)
                     runtime.register_sale(request)
-                    redirect = "/positions"
-                app = WebApp(runtime.report())
+                else:
+                    asset = parse_asset_request(form)
+                    runtime.register_asset(asset)
+                app = WebApp(runtime.report(), AssetCatalog.all())
+                redirect = "/positions" if self.path != "/assets" else "/assets"
             except (ValueError, InvalidOperation) as exc:
                 values = {key: values[0] if values else "" for key, values in form.items()}
                 if self.path == "/investments":
                     body = app.render_investment_form(str(exc), values).encode("utf-8")
-                else:
+                elif self.path == "/sales":
                     body = app.render_sale_form(str(exc), values).encode("utf-8")
+                else:
+                    body = app.render_asset_form(str(exc), values).encode("utf-8")
                 self.send_response(400)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.send_header("Content-Length", str(len(body)))
@@ -201,10 +237,11 @@ def main() -> None:
     parser.add_argument("movements_file")
     parser.add_argument("--investments-file", default=DEFAULT_INVESTMENTS_FILE)
     parser.add_argument("--sales-file", default=DEFAULT_SALES_FILE)
+    parser.add_argument("--assets-file", default=str(DEFAULT_ASSETS_FILE))
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)
     args = parser.parse_args()
-    serve(Path(args.movements_file), args.host, args.port, Path(args.investments_file), Path(args.sales_file))
+    serve(Path(args.movements_file), args.host, args.port, Path(args.investments_file), Path(args.sales_file), Path(args.assets_file))
 
 
 if __name__ == "__main__":

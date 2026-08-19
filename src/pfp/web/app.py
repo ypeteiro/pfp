@@ -7,6 +7,7 @@ from urllib.parse import parse_qs, urlsplit
 
 from pfp.reporting.portfolio_report import PortfolioReport
 from pfp.web.allocation_ui import allocation_html
+from pfp.web.asset_ui import asset_form_html, assets_html
 from pfp.web.dashboard_ui import dashboard_v2_html
 from pfp.web.movements_ui import movements_html
 from pfp.web.investment_ui import investment_form_html
@@ -18,6 +19,7 @@ from pfp.web.sale_ui import sale_form_html
 @dataclass(frozen=True, slots=True)
 class WebApp:
     report: PortfolioReport
+    assets: tuple = ()
 
     def render(self, path: str) -> str:
         parsed = urlsplit(path)
@@ -25,7 +27,7 @@ class WebApp:
         query = parse_qs(parsed.query)
         sort = query.get("sort", ["weight"])[0]
         direction = query.get("direction", ["desc"])[0]
-        pages = {"/": self._dashboard, "/index.html": self._dashboard, "/positions": self._positions, "/movements": self._movements, "/allocation": self._allocation, "/investments/new": self._investment_form, "/sales/new": self._sale_form}
+        pages = {"/": self._dashboard, "/index.html": self._dashboard, "/positions": self._positions, "/movements": self._movements, "/allocation": self._allocation, "/investments/new": self._investment_form, "/sales/new": self._sale_form, "/assets": self._assets, "/assets/new": self._asset_form}
         renderer = pages.get(route)
         if renderer is None:
             raise KeyError(route)
@@ -39,12 +41,14 @@ class WebApp:
             content = self._investment_form()
         elif route == "/sales/new":
             content = self._sale_form()
+        elif route == "/assets/new":
+            content = self._asset_form()
         else:
             content = renderer()
         return self._layout(content, route)
 
     def _layout(self, content: str, path: str) -> str:
-        return f'''<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PFP</title><style>{CSS}</style></head><body><header><div><strong>PFP</strong><span>Personal Finance Portfolio</span></div><div class="header-actions">{navigation_html(path)}<a class="new-investment-link" href="/investments/new">+ Inversión</a><a class="new-investment-link" href="/sales/new">− Venta</a><a class="refresh-link" href="/refresh" title="Volver a leer los datos, inversiones, ventas y precios de mercado">Actualizar datos</a></div></header><main>{content}</main><footer class="app-footer"><a href="https://github.com/ypeteiro/pfp#readme" target="_blank" rel="noopener noreferrer">Ayuda y documentación (README)</a></footer></body></html>'''
+        return f'''<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PFP</title><style>{CSS}</style></head><body><header><div><strong>PFP</strong><span>Personal Finance Portfolio</span></div><div class="header-actions">{navigation_html(path)}<a class="new-investment-link" href="/assets">Activos</a><a class="new-investment-link" href="/investments/new">+ Inversión</a><a class="new-investment-link" href="/sales/new">− Venta</a><a class="refresh-link" href="/refresh" title="Volver a leer los datos, inversiones, ventas y precios de mercado">Actualizar datos</a></div></header><main>{content}</main><footer class="app-footer"><a href="https://github.com/ypeteiro/pfp#readme" target="_blank" rel="noopener noreferrer">Ayuda y documentación (README)</a></footer></body></html>'''
 
     def _dashboard(self, sort: str = "weight", direction: str = "desc") -> str:
         return dashboard_v2_html(self.report, sort, direction)
@@ -61,16 +65,25 @@ class WebApp:
         return allocation_html(self.report)
 
     def _investment_form(self, error: str | None = None, values: dict[str, str] | None = None) -> str:
-        return investment_form_html(error=error, values=values)
+        return investment_form_html(error=error, values=values, assets=self.assets)
 
     def _sale_form(self, error: str | None = None, values: dict[str, str] | None = None) -> str:
-        return sale_form_html(error=error, values=values)
+        return sale_form_html(error=error, values=values, assets=self.assets)
+
+    def _assets(self) -> str:
+        return assets_html(self.assets)
+
+    def _asset_form(self, error: str | None = None, values: dict[str, str] | None = None) -> str:
+        return asset_form_html(error=error, values=values)
 
     def render_investment_form(self, error: str | None = None, values: dict[str, str] | None = None) -> str:
         return self._layout(self._investment_form(error, values), "/investments/new")
 
     def render_sale_form(self, error: str | None = None, values: dict[str, str] | None = None) -> str:
         return self._layout(self._sale_form(error, values), "/sales/new")
+
+    def render_asset_form(self, error: str | None = None, values: dict[str, str] | None = None) -> str:
+        return self._layout(self._asset_form(error, values), "/assets/new")
 
 
 CSS = """

@@ -2,6 +2,7 @@ from decimal import Decimal
 
 import pytest
 
+from pfp.domain.asset import Asset
 from pfp.reporting.portfolio_report import PortfolioReport
 from pfp.web.app import WebApp
 
@@ -29,3 +30,13 @@ def test_app_marks_navigation_and_rejects_unknown_route():
     assert 'aria-current="page" class="active"' in html
     with pytest.raises(KeyError):
         WebApp(report()).render("/unknown")
+
+
+def test_app_renders_configured_assets_and_transaction_forms():
+    asset = Asset("TEST", "Test Holdings", "STOCK", ticker="TST")
+    app = WebApp(report(), (asset,))
+
+    assert "Test Holdings" in app.render("/assets")
+    assert "Nuevo activo" in app.render("/assets/new")
+    assert "TEST" in app.render("/investments/new")
+    assert "TEST" in app.render("/sales/new")
