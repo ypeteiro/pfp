@@ -12,38 +12,49 @@ class PortfolioEngine:
         portfolio = Portfolio()
         portfolio.movements = movements
         accounts = {}
+        account_cash = {}
+
         for movement in movements:
-            if movement.account_type not in accounts:
-                accounts[movement.account_type] = Account(
+            account_key = (movement.account_type, movement.broker, movement.currency)
+            if account_key not in accounts:
+                accounts[account_key] = Account(
                     name=movement.broker,
                     broker=movement.broker,
                     currency=movement.currency,
                 )
-        portfolio.accounts = list(accounts.values())
+                account_cash[account_key] = Decimal("0")
+
         for movement in movements:
+            account_key = (movement.account_type, movement.broker, movement.currency)
             if movement.type == "TRANSFER_INSTANT_INBOUND":
                 portfolio.cash += movement.amount
+                account_cash[account_key] += movement.amount
             elif movement.type == "BUY":
                 if movement.symbol is None or movement.shares is None or movement.price is None:
                     continue
                 asset = AssetCatalog.get_or_create(movement.symbol, movement.name, movement.asset_class)
+                cost = abs(movement.amount) + abs(movement.fee) + abs(movement.tax)
                 self._apply_buy(
                     portfolio,
                     movement.symbol,
                     asset.name,
                     movement.shares,
-                    abs(movement.amount) + abs(movement.fee) + abs(movement.tax),
+                    cost,
                     asset.portfolio_class,
                 )
+                account_cash[account_key] -= cost
             elif movement.type == "SELL":
                 if movement.symbol is None or movement.shares is None or movement.amount is None:
                     continue
+                proceeds = movement.amount + movement.fee + movement.tax
                 self._apply_sell(
                     portfolio,
                     movement.symbol,
                     movement.shares,
-                    movement.amount + movement.fee + movement.tax,
+                    proceeds,
                 )
+                account_cash[account_key] += proceeds
+
         if investments is not None:
             for investment in investments:
                 self._apply_buy(
@@ -55,6 +66,7 @@ class PortfolioEngine:
                     investment.portfolio_class,
                     allow_insufficient_cash=True,
                 )
+
         if sales is not None:
             for sale in sales:
                 self._apply_sell(
@@ -63,6 +75,7 @@ class PortfolioEngine:
                     sale.shares,
                     sale.amount,
                 )
+
         portfolio.invested = sum(position.invested for position in portfolio.positions.values())
         for position in portfolio.positions.values():
             if position.shares:
@@ -72,8 +85,10 @@ class PortfolioEngine:
                 if market_price is not None:
                     position.market_price = market_price
             position.validate()
-        for account in portfolio.accounts:
-            account.balance = portfolio.cash
+
+        for account_key, account in accounts.items():
+            account.balance = account_cash[account_key]
+        portfolio.accounts = list(accounts.values())
         return portfolio
 
     def apply_investment(self, portfolio, investment):
