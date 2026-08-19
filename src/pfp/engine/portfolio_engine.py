@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from pfp.domain.account import Account
+from pfp.domain.account_transfer import AccountTransfer
 from pfp.domain.asset_catalog import AssetCatalog
 from pfp.domain.portfolio import Portfolio
 from pfp.domain.position import Position
@@ -8,7 +9,7 @@ from pfp.domain.position import Position
 
 class PortfolioEngine:
 
-    def build(self, movements, prices=None, investments=None, sales=None, opening_balances=None):
+    def build(self, movements, prices=None, investments=None, sales=None, opening_balances=None, account_transfers=None):
         portfolio = Portfolio()
         portfolio.movements = movements
         accounts = {}
@@ -20,10 +21,25 @@ class PortfolioEngine:
         def account_name(movement):
             return movement.account_id or movement.broker
 
+        def ensure_account(account_id, broker, currency):
+            if account_id not in accounts:
+                accounts[account_id] = Account(
+                    name=account_id,
+                    broker=broker,
+                    currency=currency,
+                    account_id=account_id,
+                )
+                account_cash[account_id] = Decimal("0")
+
         for movement in movements:
             key = account_key(movement)
             if key not in accounts:
-                accounts[key] = Account(name=account_name(movement), broker=movement.broker, currency=movement.currency)
+                accounts[key] = Account(
+                    name=account_name(movement),
+                    broker=movement.broker,
+                    currency=movement.currency,
+                    account_id=key,
+                )
                 account_cash[key] = Decimal("0")
 
         for movement in movements:
@@ -49,10 +65,21 @@ class PortfolioEngine:
         if opening_balances is not None:
             for opening_balance in opening_balances:
                 key = opening_balance.account_id
-                if key not in accounts:
-                    accounts[key] = Account(name=key, broker=key, currency=opening_balance.currency)
-                    account_cash[key] = Decimal("0")
+                ensure_account(key, key, opening_balance.currency)
                 account_cash[key] += opening_balance.amount
+
+        if account_transfers is not None:
+            for transfer in account_transfers:
+                ensure_account(transfer.source_account, transfer.source_account, transfer.currency)
+                ensure_account(transfer.destination_account, transfer.destination_account, transfer.currency)
+                if accounts[transfer.source_account].currency != transfer.currency:
+                    raise ValueError("Transfer currency does not match source account currency")
+                if accounts[transfer.destination_account].currency != transfer.currency:
+                    raise ValueError("Transfer currency does not match destination account currency")
+                if account_cash[transfer.source_account] < transfer.amount:
+                    raise ValueError("Transfer exceeds source account cash")
+                account_cash[transfer.source_account] -= transfer.amount
+                account_cash[transfer.destination_account] += transfer.amount
 
         persisted_cash_delta = Decimal("0")
         if investments is not None:
