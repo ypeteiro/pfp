@@ -45,6 +45,7 @@ class PortfolioEngine:
                     movement.shares,
                     cost,
                     asset.portfolio_class,
+                    allow_insufficient_cash=True,
                 )
                 account_cash[key] -= cost
             elif movement.type == "SELL":
