@@ -261,9 +261,10 @@ def run_invest_order(symbol, amount, movements_file, investments_file, price_pro
     if position is None:
         raise ValueError("Symbol is not present in portfolio")
     price_provider = price_provider or CompositePriceProvider()
-    price = price_provider.get_prices([symbol]).get(symbol)
+    prices = price_provider.get_prices([symbol])
+    price = prices.get(symbol)
     if price is None:
-        raise ValueError("Price is not available for symbol")
+        raise ValueError(f"Market price is not available for {symbol}")
     shares = amount / price
     run_invest(symbol, shares, amount, position.portfolio_class, movements_file, investments_file, sales_file, operation_id)
 
