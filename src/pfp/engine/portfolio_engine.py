@@ -14,21 +14,25 @@ class PortfolioEngine:
         accounts = {}
         account_cash = {}
 
+        def account_key(movement):
+            return movement.account_id or f"{movement.account_type}:{movement.broker}:{movement.currency}"
+
         for movement in movements:
-            account_key = (movement.account_type, movement.broker, movement.currency)
-            if account_key not in accounts:
-                accounts[account_key] = Account(
-                    name=movement.broker,
+            key = account_key(movement)
+            if key not in accounts:
+                accounts[key] = Account(
+                    name=movement.account_id or movement.broker,
                     broker=movement.broker,
                     currency=movement.currency,
                 )
-                account_cash[account_key] = Decimal("0")
+                account_cash[key] = Decimal("0")
 
         for movement in movements:
-            account_key = (movement.account_type, movement.broker, movement.currency)
-            if movement.type == "TRANSFER_INSTANT_INBOUND":
-                portfolio.cash += movement.amount
-                account_cash[account_key] += movement.amount
+            key = account_key(movement)
+            if movement.type in {"TRANSFER_INSTANT_INBOUND", "TRANSFER_INBOUND"}:
+                account_cash[key] += movement.amount
+            elif movement.type in {"TRANSFER_INSTANT_OUTBOUND", "TRANSFER_OUTBOUND"}:
+                account_cash[key] -= abs(movement.amount)
             elif movement.type == "BUY":
                 if movement.symbol is None or movement.shares is None or movement.price is None:
                     continue
@@ -42,7 +46,7 @@ class PortfolioEngine:
                     cost,
                     asset.portfolio_class,
                 )
-                account_cash[account_key] -= cost
+                account_cash[key] -= cost
             elif movement.type == "SELL":
                 if movement.symbol is None or movement.shares is None or movement.amount is None:
                     continue
@@ -53,7 +57,7 @@ class PortfolioEngine:
                     movement.shares,
                     proceeds,
                 )
-                account_cash[account_key] += proceeds
+                account_cash[key] += proceeds
 
         if investments is not None:
             for investment in investments:
@@ -86,9 +90,10 @@ class PortfolioEngine:
                     position.market_price = market_price
             position.validate()
 
-        for account_key, account in accounts.items():
-            account.balance = account_cash[account_key]
+        for key, account in accounts.items():
+            account.balance = account_cash[key]
         portfolio.accounts = list(accounts.values())
+        portfolio.cash = sum(account_cash.values(), Decimal("0"))
         return portfolio
 
     def apply_investment(self, portfolio, investment):
