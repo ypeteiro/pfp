@@ -137,12 +137,11 @@ class RebalanceEngine:
             if not positions or abs(difference_value) < tolerance:
                 continue
 
-            selected_position = max(
-                positions,
-                key=lambda position: position.market_value,
-            )
-
             if difference_value > 0:
+                selected_position = max(
+                    positions,
+                    key=lambda position: position.market_value,
+                )
                 orders.append(
                     RebalanceOrder(
                         action="BUY",
@@ -153,18 +152,27 @@ class RebalanceEngine:
                     )
                 )
             else:
-                amount = abs(difference_value)
-                shares = amount / selected_position.market_price
-                orders.append(
-                    RebalanceOrder(
-                        action="SELL",
-                        symbol=selected_position.symbol,
-                        asset_name=selected_position.name,
-                        portfolio_class=portfolio_class,
-                        amount=amount,
-                        shares=shares,
+                remaining = abs(difference_value)
+                for position in sorted(
+                    positions,
+                    key=lambda position: position.market_value,
+                    reverse=True,
+                ):
+                    if remaining <= tolerance:
+                        break
+                    amount = min(remaining, position.market_value)
+                    shares = amount / position.market_price
+                    orders.append(
+                        RebalanceOrder(
+                            action="SELL",
+                            symbol=position.symbol,
+                            asset_name=position.name,
+                            portfolio_class=portfolio_class,
+                            amount=amount,
+                            shares=shares,
+                        )
                     )
-                )
+                    remaining -= amount
 
         return Rebalance(
             total_value=market_value,
