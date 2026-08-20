@@ -1,7 +1,6 @@
 from decimal import Decimal
 
 from pfp.domain.account import Account
-from pfp.domain.account_transfer import AccountTransfer
 from pfp.domain.asset_catalog import AssetCatalog
 from pfp.domain.portfolio import Portfolio
 from pfp.domain.position import Position
@@ -14,6 +13,7 @@ class PortfolioEngine:
         portfolio.movements = movements
         accounts = {}
         account_cash = {}
+        unallocated_cash = Decimal("0")
 
         def account_key(movement):
             return movement.account_id or f"{movement.account_type}:{movement.broker}:{movement.currency}"
@@ -23,12 +23,7 @@ class PortfolioEngine:
 
         def ensure_account(account_id, broker, currency):
             if account_id not in accounts:
-                accounts[account_id] = Account(
-                    name=account_id,
-                    broker=broker,
-                    currency=currency,
-                    account_id=account_id,
-                )
+                accounts[account_id] = Account(name=account_id, broker=broker, currency=currency, account_id=account_id)
                 account_cash[account_id] = Decimal("0")
 
         def resolve_operation_account(operation, default_broker):
@@ -36,11 +31,7 @@ class PortfolioEngine:
                 if operation.account_id not in accounts:
                     ensure_account(operation.account_id, operation.broker or default_broker, "EUR")
                 return operation.account_id
-            matches = [
-                account_id
-                for account_id, account in accounts.items()
-                if account.broker == (operation.broker or default_broker)
-            ]
+            matches = [account_id for account_id, account in accounts.items() if account.broker == (operation.broker or default_broker)]
             if len(matches) == 1:
                 return matches[0]
             if len(accounts) == 1:
@@ -50,12 +41,7 @@ class PortfolioEngine:
         for movement in movements:
             key = account_key(movement)
             if key not in accounts:
-                accounts[key] = Account(
-                    name=account_name(movement),
-                    broker=movement.broker,
-                    currency=movement.currency,
-                    account_id=key,
-                )
+                accounts[key] = Account(name=account_name(movement), broker=movement.broker, currency=movement.currency, account_id=key)
                 account_cash[key] = Decimal("0")
 
         for movement in movements:
@@ -103,12 +89,16 @@ class PortfolioEngine:
                 operation_account = resolve_operation_account(investment, "Trade Republic")
                 if operation_account is not None:
                     account_cash[operation_account] -= investment.amount
+                else:
+                    unallocated_cash -= investment.amount
         if sales is not None:
             for sale in sales:
                 self._apply_sell(portfolio, sale.symbol, sale.shares, sale.amount)
                 operation_account = resolve_operation_account(sale, "Trade Republic")
                 if operation_account is not None:
                     account_cash[operation_account] += sale.amount
+                else:
+                    unallocated_cash += sale.amount
 
         portfolio.invested = sum(position.invested for position in portfolio.positions.values())
         for position in portfolio.positions.values():
@@ -123,7 +113,7 @@ class PortfolioEngine:
         for key, account in accounts.items():
             account.balance = account_cash[key]
         portfolio.accounts = list(accounts.values())
-        portfolio.cash = sum(account_cash.values(), Decimal("0"))
+        portfolio.cash = sum(account_cash.values(), Decimal("0")) + unallocated_cash
         return portfolio
 
     def apply_investment(self, portfolio, investment):
