@@ -25,6 +25,7 @@ class PortfolioEngine:
             if account_id not in accounts:
                 accounts[account_id] = Account(name=account_id, broker=broker, currency=currency, account_id=account_id)
                 account_cash[account_id] = Decimal("0")
+                portfolio.account_positions.setdefault(account_id, {})
 
         def resolve_operation_account(operation, default_broker):
             if operation.account_id is not None:
@@ -43,6 +44,7 @@ class PortfolioEngine:
             if key not in accounts:
                 accounts[key] = Account(name=account_name(movement), broker=movement.broker, currency=movement.currency, account_id=key)
                 account_cash[key] = Decimal("0")
+                portfolio.account_positions.setdefault(key, {})
 
         for movement in movements:
             key = account_key(movement)
@@ -56,12 +58,14 @@ class PortfolioEngine:
                 asset = AssetCatalog.get_or_create(movement.symbol, movement.name, movement.asset_class)
                 cost = abs(movement.amount) + abs(movement.fee) + abs(movement.tax)
                 self._apply_buy(portfolio, movement.symbol, asset.name, movement.shares, cost, asset.portfolio_class, allow_insufficient_cash=True)
+                self._apply_account_buy(portfolio, key, movement.symbol, asset.name, movement.shares, cost, asset.portfolio_class)
                 account_cash[key] -= cost
             elif movement.type == "SELL":
                 if movement.symbol is None or movement.shares is None or movement.amount is None:
                     continue
                 proceeds = movement.amount + movement.fee + movement.tax
                 self._apply_sell(portfolio, movement.symbol, movement.shares, proceeds)
+                self._apply_account_sell(portfolio, key, movement.symbol, movement.shares, proceeds)
                 account_cash[key] += proceeds
 
         if opening_balances is not None:
@@ -88,6 +92,7 @@ class PortfolioEngine:
                 self._apply_buy(portfolio, investment.symbol, investment.symbol, investment.shares, investment.amount, investment.portfolio_class, allow_insufficient_cash=True)
                 operation_account = resolve_operation_account(investment, "Trade Republic")
                 if operation_account is not None:
+                    self._apply_account_buy(portfolio, operation_account, investment.symbol, investment.symbol, investment.shares, investment.amount, investment.portfolio_class)
                     account_cash[operation_account] -= investment.amount
                 else:
                     unallocated_cash -= investment.amount
@@ -96,6 +101,7 @@ class PortfolioEngine:
                 self._apply_sell(portfolio, sale.symbol, sale.shares, sale.amount)
                 operation_account = resolve_operation_account(sale, "Trade Republic")
                 if operation_account is not None:
+                    self._apply_account_sell(portfolio, operation_account, sale.symbol, sale.shares, sale.amount)
                     account_cash[operation_account] += sale.amount
                 else:
                     unallocated_cash += sale.amount
@@ -110,6 +116,14 @@ class PortfolioEngine:
                     position.market_price = market_price
             position.validate()
 
+        for account_positions in portfolio.account_positions.values():
+            for position in account_positions.values():
+                if prices is not None:
+                    market_price = prices.get(position.symbol)
+                    if market_price is not None:
+                        position.market_price = market_price
+                position.validate()
+
         for key, account in accounts.items():
             account.balance = account_cash[key]
         portfolio.accounts = list(accounts.values())
@@ -121,6 +135,7 @@ class PortfolioEngine:
         account = self._resolve_portfolio_account(portfolio, investment.account_id, investment.broker)
         if account is not None:
             account.balance -= investment.amount
+            self._apply_account_buy(portfolio, account.account_id, investment.symbol, investment.symbol, investment.shares, investment.amount, investment.portfolio_class)
         portfolio.invested = sum(position.invested for position in portfolio.positions.values())
         portfolio.positions[investment.symbol].validate()
         return portfolio
@@ -130,6 +145,7 @@ class PortfolioEngine:
         account = self._resolve_portfolio_account(portfolio, sale.account_id, sale.broker)
         if account is not None:
             account.balance += sale.amount
+            self._apply_account_sell(portfolio, account.account_id, sale.symbol, sale.shares, sale.amount)
         portfolio.invested = sum(position.invested for position in portfolio.positions.values())
         portfolio.positions[sale.symbol].validate()
         return portfolio
@@ -147,6 +163,42 @@ class PortfolioEngine:
         if len(portfolio.accounts) == 1:
             return portfolio.accounts[0]
         return None
+
+    @staticmethod
+    def _apply_account_buy(portfolio, account_id, symbol, name, shares, amount, portfolio_class=None):
+        positions = portfolio.account_positions.setdefault(account_id, {})
+        shares = Decimal(str(shares))
+        amount = Decimal(str(amount))
+        position = positions.get(symbol)
+        if position is None:
+            positions[symbol] = Position(symbol, name, shares, amount, amount / shares, portfolio_class)
+            return
+        position.shares += shares
+        position.invested += amount
+        position.average_price = position.invested / position.shares
+        if portfolio_class is not None:
+            position.portfolio_class = portfolio_class
+        position.validate()
+
+    @staticmethod
+    def _apply_account_sell(portfolio, account_id, symbol, shares, amount):
+        positions = portfolio.account_positions.setdefault(account_id, {})
+        shares = Decimal(str(shares))
+        amount = Decimal(str(amount))
+        position = positions.get(symbol)
+        if position is None or position.shares < shares:
+            raise ValueError(f"Insufficient account shares for {symbol}")
+        cost_basis = position.average_price * shares
+        position.shares -= shares
+        position.invested -= cost_basis
+        if position.shares == 0:
+            position.invested = Decimal("0")
+            position.average_price = Decimal("0")
+        else:
+            position.average_price = position.invested / position.shares
+        position.validate()
+        if position.shares == 0:
+            del positions[symbol]
 
     def _apply_buy(self, portfolio, symbol, name, shares, amount, portfolio_class=None, allow_insufficient_cash=False):
         shares = Decimal(str(shares))
