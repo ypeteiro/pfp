@@ -12,15 +12,15 @@ from urllib.parse import parse_qs
 
 from pfp.application.register_investment import RegisterInvestment, RegisterInvestmentRequest
 from pfp.application.register_sale import RegisterSale, RegisterSaleRequest
-from pfp.cli import DEFAULT_INVESTMENTS_FILE, DEFAULT_SALES_FILE
+from pfp.cli import DEFAULT_INVESTMENTS_FILE, DEFAULT_SALES_FILE, load_portfolio
 from pfp.domain.asset import Asset
 from pfp.domain.asset_catalog import AssetCatalog
 from pfp.domain.portfolio import Portfolio
+from pfp.domain.snapshot import PortfolioSnapshot
 from pfp.engine.portfolio_engine import PortfolioEngine
 from pfp.importers.asset_repository import AssetRepository
 from pfp.importers.investment_repository import InvestmentRepository
 from pfp.importers.sale_repository import SaleRepository
-from pfp.importers.trade_republic import TradeRepublicImporter
 from pfp.market.price_provider import CompositePriceProvider
 from pfp.reporting.portfolio_report import PortfolioReport
 from pfp.web.app import WebApp
@@ -43,14 +43,17 @@ def build_web_report(movements_file: Path, investments_file: Path | None = None,
     assets_file = assets_file or DEFAULT_ASSETS_FILE
     price_provider = price_provider or CompositePriceProvider()
     _load_assets(AssetRepository(assets_file))
-    movements = TradeRepublicImporter().load(movements_file)
-    investments = InvestmentRepository(investments_file).load()
-    sales = SaleRepository(sales_file).load()
-    engine = PortfolioEngine()
-    portfolio = engine.build(movements, investments=investments, sales=sales)
+    portfolio = load_portfolio(movements_file, investments_file, sales_file)
     prices = price_provider.get_prices(list(portfolio.positions.keys()))
     price_consulted_at = datetime.now().astimezone()
-    portfolio = engine.build(movements, prices, investments=investments, sales=sales)
+    portfolio = PortfolioEngine().build(
+        portfolio.movements,
+        prices,
+        investments=portfolio.investments,
+        sales=portfolio.sales,
+        opening_balances=portfolio.opening_balances,
+        account_transfers=portfolio.account_transfers,
+    )
     return PortfolioReport.from_portfolio(portfolio, price_consulted_at=price_consulted_at)
 
 
@@ -100,10 +103,7 @@ def build_web_runtime(movements_file: Path, investments_file: Path | None = None
     assets_file = assets_file or DEFAULT_ASSETS_FILE
     asset_repository = AssetRepository(assets_file)
     _load_assets(asset_repository)
-    movements = TradeRepublicImporter().load(movements_file)
-    investments = InvestmentRepository(investments_file).load()
-    sales = SaleRepository(sales_file).load()
-    portfolio = PortfolioEngine().build(movements, investments=investments, sales=sales)
+    portfolio = load_portfolio(movements_file, investments_file, sales_file)
     return WebRuntime(portfolio, price_provider or CompositePriceProvider(), InvestmentRepository(investments_file), SaleRepository(sales_file), asset_repository)
 
 
