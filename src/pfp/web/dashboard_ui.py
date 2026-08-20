@@ -18,7 +18,8 @@ ALLOCATION_TIPS = {
 }
 METRIC_TIPS = {
     "Patrimonio total": "Efectivo más el valor de mercado de tus posiciones.",
-    "Efectivo": "Dinero disponible que todavía no está invertido en posiciones.",
+    "Efectivo invertible": "Dinero disponible en cuentas destinadas a inversión. Actualmente corresponde a Trade Republic.",
+    "Fondo de seguridad": "Efectivo reservado y excluido del rebalanceo. Actualmente corresponde a ABANCA Ahorro.",
     "Cartera invertida": "Capital invertido neto en las posiciones. No incluye el P/L no realizado.",
     "P/L realizado": "Beneficios o pérdidas ya materializados mediante ventas realizadas.",
     "P/L no realizado": "Beneficios o pérdidas de posiciones que todavía mantienes abiertas. Cambian con el precio de mercado.",
@@ -48,7 +49,7 @@ def dashboard_v2_html(report: PortfolioReport, sort: str = "weight", direction: 
     return f"""
 <section class="dashboard-v2">
   <div class="hero"><div><h1>Tu patrimonio</h1><p class="muted">Una lectura rápida de dónde está tu dinero y cómo se desvía de tu estrategia.</p>{price_status}</div></div>
-  <section class="metric-grid">{metric("Patrimonio total", report.total_value)}{metric("Efectivo", report.cash)}{metric("Cartera invertida", report.market_value)}{metric("P/L realizado", report.realized_gain_loss)}{metric("P/L no realizado", report.unrealized_gain_loss)}{metric("P/L total", total_pl, "positive" if total_pl >= 0 else "negative")}</section>
+  <section class="metric-grid">{metric("Patrimonio total", report.total_value)}{metric("Efectivo invertible", report.investable_cash)}{metric("Fondo de seguridad", report.security_fund_cash)}{metric("Cartera invertida", report.market_value)}{metric("P/L realizado", report.realized_gain_loss)}{metric("P/L no realizado", report.unrealized_gain_loss)}{metric("P/L total", total_pl, "positive" if total_pl >= 0 else "negative")}</section>
   {evolution_html}
   <section class="two-col"><article class="panel"><div class="panel-heading allocation-panel-heading"><h2>Asignación {tooltip("Distribución actual de tu patrimonio por clase de activo.")}</h2><span>Objetivo 75 / 20 / 5</span></div>{''.join(bars)}</article><article class="panel"><div class="panel-heading"><h2>Posiciones principales</h2><span>{len(report.positions)} activos</span></div><table><thead><tr>{sort_heading("Activo", "symbol", sort, direction)}{sort_heading("Nombre", "name", sort, direction)}{sort_heading("Peso", "weight", sort, direction)}{sort_heading("Valor", "value", sort, direction)}<th>P/L</th></tr></thead><tbody>{position_rows or '<tr><td colspan="5">Sin posiciones</td></tr>'}</tbody></table></article></section>
 </section>
