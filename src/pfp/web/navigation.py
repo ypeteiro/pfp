@@ -1,7 +1,6 @@
 """Navigation model for the PFP web application."""
 
 from dataclasses import dataclass
-from html import escape
 
 
 @dataclass(frozen=True, slots=True)
@@ -19,17 +18,34 @@ NAVIGATION = (
     NavigationItem("Asignación", "/allocation"),
 )
 
-README_URL = "https://github.com/ypeteiro/pfp/blob/develop/README.md"
+OPERATIONS = (
+    NavigationItem("Activos", "/assets"),
+    NavigationItem("Nueva inversión", "/investments/new"),
+    NavigationItem("Nueva venta", "/sales/new"),
+    NavigationItem("Actualizar datos", "/refresh"),
+)
+
+HELP_PATH = "/help"
 
 
 def navigation_html(active_path: str = "/") -> str:
     links = []
     for item in NAVIGATION:
-        active = ' aria-current="page" class="active"' if not item.external and item.path == active_path else ""
-        target = ' target="_blank" rel="noopener noreferrer"' if item.external else ""
-        links.append(f'<a href="{item.path}"{active}{target}>{item.label}</a>')
+        active = ' aria-current="page" class="active"' if item.path == active_path else ""
+        links.append(f'<a href="{item.path}"{active}>{item.label}</a>')
+
+    operation_active = active_path in {item.path for item in OPERATIONS if item.path != "/refresh"}
+    open_attr = " open" if operation_active else ""
+    operation_links = "".join(
+        f'<a href="{item.path}">{item.label}</a>' for item in OPERATIONS
+    )
     links.append(
-        f'<a href="{escape(README_URL, quote=True)}" target="_blank" '
-        'rel="noopener noreferrer" class="help-link">Ayuda / README</a>'
+        f'<details class="operations-menu"{open_attr}>'
+        f'<summary>Operaciones</summary>'
+        f'<div class="operations-dropdown">{operation_links}</div>'
+        f'</details>'
+    )
+    links.append(
+        f'<a class="help-icon" href="{HELP_PATH}" aria-label="Ayuda" title="Ayuda">?</a>'
     )
     return "<nav>" + "".join(links) + "</nav>"
