@@ -6,6 +6,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from pfp.cli_output import print_portfolio
+from pfp.domain.account_catalog import DEFAULT_ACCOUNT_CATALOG
 from pfp.domain.sale import Sale
 from pfp.domain.snapshot import PortfolioSnapshot
 from pfp.engine.investment_engine import InvestmentEngine
@@ -26,6 +27,11 @@ DEFAULT_SNAPSHOTS_FILE = "data/imports/snapshots.csv"
 DEFAULT_OPENING_BALANCES_FILE = "data/accounts/abanca_ahorro_opening_balance.csv"
 DEFAULT_ACCOUNT_TRANSFERS_FILE = "data/accounts/account_transfers.csv"
 DEFAULT_ACCOUNT_ID = "Trade Republic"
+
+
+def _validate_account_id(account_id):
+    DEFAULT_ACCOUNT_CATALOG.get(account_id)
+    return account_id
 
 
 def build_parser():
@@ -192,6 +198,7 @@ def run_recommend(amount, movements_file, investments_file=DEFAULT_INVESTMENTS_F
 
 
 def _build_rebalance(movements_file, investments_file, sales_file, price_provider, account_id=DEFAULT_ACCOUNT_ID):
+    account_id = _validate_account_id(account_id)
     portfolio = load_portfolio(movements_file, investments_file, sales_file)
     prices = price_provider.get_prices(list(portfolio.positions.keys()))
     movements = TradeRepublicImporter().load(movements_file)
@@ -204,11 +211,13 @@ def _build_rebalance(movements_file, investments_file, sales_file, price_provide
 
 
 def _rebalance_operation_id(rebalance, order, account_id=DEFAULT_ACCOUNT_ID):
+    account_id = _validate_account_id(account_id)
     payload = "|".join(("rebalance", account_id, str(rebalance.total_value), order.action, order.symbol, order.portfolio_class, str(order.amount), str(order.shares)))
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def _execute_rebalance(rebalance, movements_file, investments_file, sales_file, price_provider, account_id=DEFAULT_ACCOUNT_ID):
+    account_id = _validate_account_id(account_id)
     current = _build_rebalance(movements_file, investments_file, sales_file, price_provider, account_id=account_id)
     if current != rebalance:
         raise ValueError("Portfolio changed since rebalance calculation")
@@ -223,6 +232,7 @@ def _execute_rebalance(rebalance, movements_file, investments_file, sales_file, 
 
 
 def run_rebalance(movements_file, investments_file=DEFAULT_INVESTMENTS_FILE, sales_file=DEFAULT_SALES_FILE, price_provider=None, execute=False, account_id=DEFAULT_ACCOUNT_ID):
+    account_id = _validate_account_id(account_id)
     price_provider = price_provider or CompositePriceProvider()
     rebalance = _build_rebalance(movements_file, investments_file, sales_file, price_provider, account_id=account_id)
     print()
@@ -263,6 +273,7 @@ def run_rebalance(movements_file, investments_file=DEFAULT_INVESTMENTS_FILE, sal
 
 
 def run_invest(symbol, shares, amount, portfolio_class, movements_file, investments_file, sales_file=DEFAULT_SALES_FILE, operation_id=None, account_id=DEFAULT_ACCOUNT_ID):
+    account_id = _validate_account_id(account_id)
     investment = InvestmentEngine().create(symbol=symbol, shares=shares, amount=amount, portfolio_class=portfolio_class, datetime=datetime.now(timezone.utc), account_id=account_id)
     investment = replace(investment, operation_id=operation_id)
     InvestmentRepository(investments_file).save(investment)
@@ -286,6 +297,7 @@ def run_invest(symbol, shares, amount, portfolio_class, movements_file, investme
 
 
 def run_invest_order(symbol, amount, movements_file, investments_file, price_provider=None, sales_file=DEFAULT_SALES_FILE, operation_id=None, account_id=DEFAULT_ACCOUNT_ID):
+    account_id = _validate_account_id(account_id)
     amount = Decimal(str(amount))
     if amount <= 0:
         raise ValueError("Amount must be greater than zero")
@@ -303,6 +315,7 @@ def run_invest_order(symbol, amount, movements_file, investments_file, price_pro
 
 
 def run_sell(symbol, shares, amount, movements_file, sales_file=DEFAULT_SALES_FILE, investments_file=DEFAULT_INVESTMENTS_FILE, operation_id=None, account_id=DEFAULT_ACCOUNT_ID):
+    account_id = _validate_account_id(account_id)
     shares = Decimal(str(shares))
     amount = Decimal(str(amount))
     if shares <= 0:
