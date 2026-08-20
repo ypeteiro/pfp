@@ -4,10 +4,13 @@ from decimal import Decimal
 import pytest
 
 from pfp.domain.account import Account
+from pfp.domain.account_opening_balance import AccountOpeningBalance
+from pfp.domain.account_transfer import AccountTransfer
 from pfp.domain.capital_flow import CapitalFlow, FlowType
 from pfp.domain.investment import Investment
 from pfp.domain.portfolio import Portfolio
 from pfp.domain.sale import Sale
+from pfp.engine.portfolio_engine import PortfolioEngine
 
 
 WHEN = datetime(2026, 1, 1)
@@ -26,6 +29,90 @@ def test_portfolio_can_contain_accounts():
     assert len(portfolio.accounts) == 1
     assert portfolio.accounts[0].name == "Trade Republic"
     assert portfolio.accounts[0].balance == Decimal("3603.39")
+
+
+def test_account_can_have_explicit_stable_identity():
+    account = Account(
+        name="Trade Republic",
+        broker="Trade Republic",
+        account_id="trade_republic",
+    )
+
+    assert account.id == "trade_republic"
+
+
+def test_account_transfer_validates_basic_invariants():
+    transfer = AccountTransfer(
+        datetime=WHEN,
+        source_account="abanca_nomina",
+        destination_account="trade_republic",
+        amount=Decimal("800"),
+        currency="EUR",
+    )
+
+    assert transfer.amount == Decimal("800")
+
+    with pytest.raises(ValueError, match="Transfer amount must be greater than zero"):
+        AccountTransfer(WHEN, "abanca_nomina", "trade_republic", Decimal("0"), "EUR")
+
+    with pytest.raises(ValueError, match="Source and destination accounts must differ"):
+        AccountTransfer(WHEN, "abanca_nomina", "abanca_nomina", Decimal("1"), "EUR")
+
+
+def test_portfolio_engine_moves_cash_between_accounts_without_changing_total_cash():
+    opening_balances = [
+        AccountOpeningBalance(
+            account_id="abanca_nomina",
+            date=WHEN.date(),
+            amount=Decimal("1000"),
+        )
+    ]
+    transfer = AccountTransfer(
+        datetime=WHEN,
+        source_account="abanca_nomina",
+        destination_account="trade_republic",
+        amount=Decimal("800"),
+        currency="EUR",
+    )
+
+    portfolio = PortfolioEngine().build(
+        [],
+        opening_balances=opening_balances,
+        account_transfers=[transfer],
+    )
+
+    balances = {account.id: account.balance for account in portfolio.accounts}
+    assert balances == {
+        "abanca_nomina": Decimal("200"),
+        "trade_republic": Decimal("800"),
+    }
+    assert portfolio.cash == Decimal("1000")
+    assert portfolio.invested == Decimal("0")
+    assert portfolio.realized_gain_loss == Decimal("0")
+
+
+def test_portfolio_engine_rejects_transfer_exceeding_source_cash():
+    opening_balances = [
+        AccountOpeningBalance(
+            account_id="abanca_nomina",
+            date=WHEN.date(),
+            amount=Decimal("500"),
+        )
+    ]
+    transfer = AccountTransfer(
+        datetime=WHEN,
+        source_account="abanca_nomina",
+        destination_account="trade_republic",
+        amount=Decimal("800"),
+        currency="EUR",
+    )
+
+    with pytest.raises(ValueError, match="Transfer exceeds source account cash"):
+        PortfolioEngine().build(
+            [],
+            opening_balances=opening_balances,
+            account_transfers=[transfer],
+        )
 
 
 def test_contribution_increases_cash_and_withdrawal_reduces_it():

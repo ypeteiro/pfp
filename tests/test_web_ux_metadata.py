@@ -38,3 +38,12 @@ def test_navigation_includes_readme_link():
     assert "Ayuda / README" in html
     assert "target=\"_blank\"" in html
     assert "rel=\"noopener noreferrer\"" in html
+
+
+def test_navigation_exposes_refresh_as_compact_icon():
+    html = navigation_html("/")
+    assert 'class="refresh-icon"' in html
+    assert 'href="/refresh"' in html
+    assert 'aria-label="Actualizar datos"' in html
+    assert 'title="Actualizar datos"' in html
+    assert 'href="/refresh">Actualizar datos' not in html

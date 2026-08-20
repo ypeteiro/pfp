@@ -5,6 +5,7 @@ from pfp.config import load_target_allocation
 
 
 TARGET_ALLOCATION = load_target_allocation()
+DEFAULT_REBALANCE_ACCOUNT_ID = "Trade Republic"
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,7 +46,7 @@ class RebalanceEngine:
             else TARGET_ALLOCATION.copy()
         )
 
-    def rebalance(self, portfolio):
+    def rebalance(self, portfolio, account_id=DEFAULT_REBALANCE_ACCOUNT_ID):
         class_values = {
             portfolio_class: Decimal("0")
             for portfolio_class in self.target_allocation
@@ -54,25 +55,51 @@ class RebalanceEngine:
             portfolio_class: []
             for portfolio_class in self.target_allocation
         }
-        market_value = portfolio.cash
 
+        # The total portfolio remains consolidated. Only the rebalanceable
+        # portion is scoped to the selected account.
+        market_value = portfolio.cash
         for position in portfolio.positions.values():
             if position.market_price is None:
                 raise ValueError(
                     f"Market price is not available for {position.symbol}"
                 )
+            market_value += position.market_value
 
-            position_value = position.market_value
-            market_value += position_value
+        account_positions = portfolio.account_positions.get(account_id)
+        if portfolio.accounts:
+            if account_positions is None:
+                account = next(
+                    (account for account in portfolio.accounts if account.account_id == account_id),
+                    None,
+                )
+                if account is None:
+                    raise ValueError(f"Rebalance account not found: {account_id}")
+                account_positions = {}
+            rebalanceable_cash = next(
+                (account.balance for account in portfolio.accounts if account.account_id == account_id),
+                None,
+            )
+            if rebalanceable_cash is None:
+                raise ValueError(f"Rebalance account not found: {account_id}")
+        else:
+            # Preserve the legacy single-portfolio contract for callers that
+            # have no account model yet.
+            account_positions = portfolio.positions
+            rebalanceable_cash = portfolio.cash
 
+        for position in account_positions.values():
+            if position.market_price is None:
+                raise ValueError(
+                    f"Market price is not available for {position.symbol}"
+                )
             portfolio_class = getattr(position, "portfolio_class", None)
             if portfolio_class not in class_values:
                 continue
-
-            class_values[portfolio_class] += position_value
+            class_values[portfolio_class] += position.market_value
             positions_by_class[portfolio_class].append(position)
 
-        rebalanceable_value = portfolio.cash + sum(class_values.values())
+        rebalanceable_value = rebalanceable_cash + sum(class_values.values())
 
         if market_value <= 0:
             raise ValueError("Portfolio has no value to rebalance")

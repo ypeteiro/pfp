@@ -13,6 +13,7 @@ class Investment:
     portfolio_class: str
     broker: str = "Trade Republic"
     operation_id: str | None = None
+    account_id: str | None = None
 
     def __post_init__(self) -> None:
         if not self.symbol.strip():
@@ -29,3 +30,5 @@ class Investment:
             raise ValueError("Investment broker cannot be empty")
         if self.operation_id is not None and not self.operation_id.strip():
             raise ValueError("Investment operation_id cannot be empty")
+        if self.account_id is not None and not self.account_id.strip():
+            raise ValueError("Investment account_id cannot be empty")
