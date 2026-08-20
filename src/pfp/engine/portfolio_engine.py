@@ -65,8 +65,14 @@ class PortfolioEngine:
                     continue
                 proceeds = movement.amount + movement.fee + movement.tax
                 self._apply_sell(portfolio, movement.symbol, movement.shares, proceeds)
-                self._apply_account_sell(portfolio, key, movement.symbol, movement.shares, proceeds)
-                account_cash[key] += proceeds
+                operation_account = self._resolve_account_position_id(
+                    portfolio,
+                    key,
+                    movement.symbol,
+                    movement.shares,
+                )
+                self._apply_account_sell(portfolio, operation_account, movement.symbol, movement.shares, proceeds)
+                account_cash[operation_account] += proceeds
 
         if opening_balances is not None:
             for opening_balance in opening_balances:
@@ -101,7 +107,14 @@ class PortfolioEngine:
                 self._apply_sell(portfolio, sale.symbol, sale.shares, sale.amount)
                 operation_account = resolve_operation_account(sale, "Trade Republic")
                 if operation_account is not None:
-                    self._apply_account_sell(portfolio, operation_account, sale.symbol, sale.shares, sale.amount)
+                    self._apply_account_sell(
+                        portfolio,
+                        operation_account,
+                        sale.symbol,
+                        sale.shares,
+                        sale.amount,
+                        strict=False,
+                    )
                     account_cash[operation_account] += sale.amount
                 else:
                     unallocated_cash += sale.amount
@@ -165,6 +178,20 @@ class PortfolioEngine:
         return None
 
     @staticmethod
+    def _resolve_account_position_id(portfolio, account_id, symbol, shares):
+        positions = portfolio.account_positions.get(account_id, {})
+        if symbol in positions and positions[symbol].shares >= shares:
+            return account_id
+        candidates = []
+        for candidate_id, candidate_positions in portfolio.account_positions.items():
+            position = candidate_positions.get(symbol)
+            if position is not None and position.shares >= shares:
+                candidates.append(candidate_id)
+        if len(candidates) == 1:
+            return candidates[0]
+        return account_id
+
+    @staticmethod
     def _apply_account_buy(portfolio, account_id, symbol, name, shares, amount, portfolio_class=None):
         positions = portfolio.account_positions.setdefault(account_id, {})
         shares = Decimal(str(shares))
@@ -181,13 +208,15 @@ class PortfolioEngine:
         position.validate()
 
     @staticmethod
-    def _apply_account_sell(portfolio, account_id, symbol, shares, amount):
+    def _apply_account_sell(portfolio, account_id, symbol, shares, amount, strict=True):
         positions = portfolio.account_positions.setdefault(account_id, {})
         shares = Decimal(str(shares))
         amount = Decimal(str(amount))
         position = positions.get(symbol)
         if position is None or position.shares < shares:
-            raise ValueError(f"Insufficient account shares for {symbol}")
+            if strict:
+                raise ValueError(f"Insufficient account shares for {symbol}")
+            return
         cost_basis = position.average_price * shares
         position.shares -= shares
         position.invested -= cost_basis
