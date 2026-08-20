@@ -31,6 +31,22 @@ class PortfolioEngine:
                 )
                 account_cash[account_id] = Decimal("0")
 
+        def resolve_operation_account(operation, default_broker):
+            if operation.account_id is not None:
+                if operation.account_id not in accounts:
+                    ensure_account(operation.account_id, operation.broker or default_broker, "EUR")
+                return operation.account_id
+            matches = [
+                account_id
+                for account_id, account in accounts.items()
+                if account.broker == (operation.broker or default_broker)
+            ]
+            if len(matches) == 1:
+                return matches[0]
+            if len(accounts) == 1:
+                return next(iter(accounts))
+            return None
+
         for movement in movements:
             key = account_key(movement)
             if key not in accounts:
@@ -81,15 +97,18 @@ class PortfolioEngine:
                 account_cash[transfer.source_account] -= transfer.amount
                 account_cash[transfer.destination_account] += transfer.amount
 
-        persisted_cash_delta = Decimal("0")
         if investments is not None:
             for investment in investments:
                 self._apply_buy(portfolio, investment.symbol, investment.symbol, investment.shares, investment.amount, investment.portfolio_class, allow_insufficient_cash=True)
-                persisted_cash_delta -= investment.amount
+                operation_account = resolve_operation_account(investment, "Trade Republic")
+                if operation_account is not None:
+                    account_cash[operation_account] -= investment.amount
         if sales is not None:
             for sale in sales:
                 self._apply_sell(portfolio, sale.symbol, sale.shares, sale.amount)
-                persisted_cash_delta += sale.amount
+                operation_account = resolve_operation_account(sale, "Trade Republic")
+                if operation_account is not None:
+                    account_cash[operation_account] += sale.amount
 
         portfolio.invested = sum(position.invested for position in portfolio.positions.values())
         for position in portfolio.positions.values():
@@ -104,20 +123,40 @@ class PortfolioEngine:
         for key, account in accounts.items():
             account.balance = account_cash[key]
         portfolio.accounts = list(accounts.values())
-        portfolio.cash = sum(account_cash.values(), Decimal("0")) + persisted_cash_delta
+        portfolio.cash = sum(account_cash.values(), Decimal("0"))
         return portfolio
 
     def apply_investment(self, portfolio, investment):
         self._apply_buy(portfolio, investment.symbol, investment.symbol, investment.shares, investment.amount, investment.portfolio_class)
+        account = self._resolve_portfolio_account(portfolio, investment.account_id, investment.broker)
+        if account is not None:
+            account.balance -= investment.amount
         portfolio.invested = sum(position.invested for position in portfolio.positions.values())
         portfolio.positions[investment.symbol].validate()
         return portfolio
 
     def apply_sale(self, portfolio, sale):
         self._apply_sell(portfolio, sale.symbol, sale.shares, sale.amount)
+        account = self._resolve_portfolio_account(portfolio, sale.account_id, sale.broker)
+        if account is not None:
+            account.balance += sale.amount
         portfolio.invested = sum(position.invested for position in portfolio.positions.values())
         portfolio.positions[sale.symbol].validate()
         return portfolio
+
+    @staticmethod
+    def _resolve_portfolio_account(portfolio, account_id, broker):
+        if account_id is not None:
+            for account in portfolio.accounts:
+                if account.account_id == account_id:
+                    return account
+            raise ValueError(f"Account not found: {account_id}")
+        matches = [account for account in portfolio.accounts if account.broker == broker]
+        if len(matches) == 1:
+            return matches[0]
+        if len(portfolio.accounts) == 1:
+            return portfolio.accounts[0]
+        return None
 
     def _apply_buy(self, portfolio, symbol, name, shares, amount, portfolio_class=None, allow_insufficient_cash=False):
         shares = Decimal(str(shares))
