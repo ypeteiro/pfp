@@ -11,14 +11,13 @@ from pfp.domain.sale import Sale
 
 @dataclass(slots=True)
 class Portfolio:
-
     movements: list[Movement] = field(default_factory=list)
     accounts: list[Account] = field(default_factory=list)
     positions: dict[str, Position] = field(default_factory=dict)
-    account_positions: dict[str, dict[str, Position]] = field(default_factory=dict)
     cash: Decimal = Decimal("0")
     invested: Decimal = Decimal("0")
     realized_gain_loss: Decimal = Decimal("0")
+    account_positions: dict[str, dict[str, Position]] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         self.validate()
@@ -26,7 +25,6 @@ class Portfolio:
     def validate(self) -> None:
         if self.invested < 0:
             raise ValueError("Invested amount cannot be negative")
-
         position_cost_basis = Decimal("0")
         for symbol, position in self.positions.items():
             if symbol != position.symbol:
@@ -38,11 +36,9 @@ class Portfolio:
             if position.average_price < 0:
                 raise ValueError("Position average price cannot be negative")
             position_cost_basis += position.invested
-
         if self.invested != position_cost_basis:
             raise ValueError("Portfolio invested amount must equal position cost basis")
-
-        for account_id, positions in self.account_positions.items():
+        for positions in self.account_positions.values():
             for symbol, position in positions.items():
                 if symbol != position.symbol:
                     raise ValueError("Account position key must match position symbol")
