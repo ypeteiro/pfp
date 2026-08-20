@@ -7,18 +7,21 @@ class AccountDefinition:
     name: str
     broker: str
     currency: str = "EUR"
+    is_investable: bool = True
 
 
 TRADE_REPUBLIC_ACCOUNT = AccountDefinition(
     account_id="Trade Republic",
     name="Trade Republic",
     broker="Trade Republic",
+    is_investable=True,
 )
 
 ABANCA_AHORRO_ACCOUNT = AccountDefinition(
     account_id="ABANCA_AHORRO",
     name="ABANCA Ahorro",
     broker="ABANCA_AHORRO",
+    is_investable=False,
 )
 
 
