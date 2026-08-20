@@ -16,8 +16,6 @@ from pfp.cli import DEFAULT_INVESTMENTS_FILE, DEFAULT_SALES_FILE, load_portfolio
 from pfp.domain.asset import Asset
 from pfp.domain.asset_catalog import AssetCatalog
 from pfp.domain.portfolio import Portfolio
-from pfp.domain.snapshot import PortfolioSnapshot
-from pfp.engine.portfolio_engine import PortfolioEngine
 from pfp.importers.asset_repository import AssetRepository
 from pfp.importers.investment_repository import InvestmentRepository
 from pfp.importers.sale_repository import SaleRepository
@@ -37,6 +35,13 @@ def _load_assets(asset_repository: AssetRepository) -> None:
         AssetCatalog.register(asset)
 
 
+def _value_portfolio(portfolio: Portfolio, price_provider) -> Portfolio:
+    prices = price_provider.get_prices(list(portfolio.positions.keys()))
+    for symbol, position in portfolio.positions.items():
+        position.market_price = prices.get(symbol)
+    return portfolio
+
+
 def build_web_report(movements_file: Path, investments_file: Path | None = None, sales_file: Path | None = None, price_provider=None, assets_file: Path | None = None) -> PortfolioReport:
     investments_file = investments_file or Path(DEFAULT_INVESTMENTS_FILE)
     sales_file = sales_file or Path(DEFAULT_SALES_FILE)
@@ -44,17 +49,8 @@ def build_web_report(movements_file: Path, investments_file: Path | None = None,
     price_provider = price_provider or CompositePriceProvider()
     _load_assets(AssetRepository(assets_file))
     portfolio = load_portfolio(movements_file, investments_file, sales_file)
-    prices = price_provider.get_prices(list(portfolio.positions.keys()))
-    price_consulted_at = datetime.now().astimezone()
-    portfolio = PortfolioEngine().build(
-        portfolio.movements,
-        prices,
-        investments=portfolio.investments,
-        sales=portfolio.sales,
-        opening_balances=portfolio.opening_balances,
-        account_transfers=portfolio.account_transfers,
-    )
-    return PortfolioReport.from_portfolio(portfolio, price_consulted_at=price_consulted_at)
+    portfolio = _value_portfolio(portfolio, price_provider)
+    return PortfolioReport.from_portfolio(portfolio, price_consulted_at=datetime.now().astimezone())
 
 
 @dataclass(slots=True)
@@ -91,9 +87,7 @@ class WebRuntime:
         return asset
 
     def report(self) -> PortfolioReport:
-        prices = self.price_provider.get_prices(list(self.portfolio.positions.keys()))
-        for symbol, position in self.portfolio.positions.items():
-            position.market_price = prices.get(symbol)
+        _value_portfolio(self.portfolio, self.price_provider)
         return PortfolioReport.from_portfolio(self.portfolio, price_consulted_at=datetime.now().astimezone())
 
 
