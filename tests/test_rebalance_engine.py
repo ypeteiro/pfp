@@ -60,6 +60,31 @@ def test_rebalance_uses_existing_position_for_orders():
     assert {order.symbol for order in rebalance.orders} == {"EQUITY", "BOND", "GOLD"}
 
 
+def test_rebalance_splits_large_sale_across_positions():
+    portfolio = Portfolio(cash=Decimal("0"))
+    portfolio.positions = {
+        "BOND_A": Position(
+            symbol="BOND_A", name="Bond A", shares=Decimal("45"),
+            invested=Decimal("4500"), average_price=Decimal("100"),
+            portfolio_class="FIXED_INCOME", market_price=Decimal("100"),
+        ),
+        "BOND_B": Position(
+            symbol="BOND_B", name="Bond B", shares=Decimal("35"),
+            invested=Decimal("3500"), average_price=Decimal("100"),
+            portfolio_class="FIXED_INCOME", market_price=Decimal("100"),
+        ),
+    }
+
+    rebalance = RebalanceEngine().rebalance(portfolio)
+
+    sales = [order for order in rebalance.orders if order.portfolio_class == "FIXED_INCOME"]
+    assert [(order.symbol, order.amount, order.shares) for order in sales] == [
+        ("BOND_A", Decimal("4500"), Decimal("45")),
+        ("BOND_B", Decimal("1500"), Decimal("15")),
+    ]
+    assert all(order.amount <= Decimal("4500") for order in sales)
+
+
 def test_rebalance_excludes_non_rebalanceable_assets_from_target_allocation():
     portfolio = build_portfolio()
     portfolio.positions["BTC"] = Position(
