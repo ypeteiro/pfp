@@ -1,4 +1,5 @@
 from pfp.cli import load_portfolio
+from pfp.market.price_provider import CompositePriceProvider
 from pfp.reporting.portfolio_report import PortfolioReport
 
 DEFAULT_INVESTMENTS_FILE = "data/imports/investments.csv"
@@ -7,11 +8,11 @@ DEFAULT_SALES_FILE = "data/imports/sales.csv"
 
 def run_portfolio(movements_file, investments_file=DEFAULT_INVESTMENTS_FILE, sales_file=DEFAULT_SALES_FILE, price_provider=None):
     portfolio = load_portfolio(movements_file, investments_file, sales_file)
-    if price_provider is not None:
-        prices = price_provider.get_prices(list(portfolio.positions.keys()))
-        for position in portfolio.positions.values():
-            if position.symbol in prices:
-                position.market_price = prices[position.symbol]
+    price_provider = price_provider or CompositePriceProvider()
+    prices = price_provider.get_prices(list(portfolio.positions.keys()))
+    for position in portfolio.positions.values():
+        if position.symbol in prices:
+            position.market_price = prices[position.symbol]
     report = PortfolioReport.from_portfolio(portfolio)
 
     print()
