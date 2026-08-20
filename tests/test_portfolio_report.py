@@ -86,3 +86,21 @@ def test_portfolio_report_account_with_unpriced_position_has_no_total_value():
     assert account_report.invested == Decimal("100")
     assert account_report.market_value is None
     assert account_report.total_value is None
+
+
+def test_portfolio_report_separates_investable_cash_from_security_fund():
+    portfolio = Portfolio(
+        cash=Decimal("1000"),
+        accounts=[
+            Account("Trade Republic", "Trade Republic", balance=Decimal("300"), account_id="Trade Republic"),
+            Account("ABANCA Ahorro", "ABANCA_AHORRO", balance=Decimal("700"), account_id="ABANCA_AHORRO"),
+        ],
+    )
+
+    report = PortfolioReport.from_portfolio(portfolio)
+
+    assert report.investable_cash == Decimal("300")
+    assert report.security_fund_cash == Decimal("700")
+    assert report.investable_cash + report.security_fund_cash == report.cash
+    assert {account.account_id for account in report.accounts if account.is_investable} == {"Trade Republic"}
+    assert {account.account_id for account in report.accounts if not account.is_investable} == {"ABANCA_AHORRO"}
