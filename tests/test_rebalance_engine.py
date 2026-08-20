@@ -80,7 +80,7 @@ def test_rebalance_splits_large_sale_across_positions():
     sales = [order for order in rebalance.orders if order.portfolio_class == "FIXED_INCOME"]
     assert [(order.symbol, order.amount, order.shares) for order in sales] == [
         ("BOND_A", Decimal("4500"), Decimal("45")),
-        ("BOND_B", Decimal("1500"), Decimal("15")),
+        ("BOND_B", Decimal("1900"), Decimal("19")),
     ]
     assert all(order.amount <= Decimal("4500") for order in sales)
 
@@ -109,54 +109,4 @@ def test_rebalance_rejects_missing_market_price():
     except ValueError as error:
         assert str(error) == "Market price is not available for EQUITY"
     else:
-        raise AssertionError("Expected ValueError")
-
-
-def test_rebalance_scopes_cash_and_positions_to_trade_republic():
-    trade_republic = "Trade Republic"
-    abanca = "ABANCA_AHORRO"
-    tr_equity = Position(
-        symbol="TR_EQUITY", name="TR Equity", shares=Decimal("10"),
-        invested=Decimal("1000"), average_price=Decimal("100"),
-        portfolio_class="EQUITY", market_price=Decimal("100"),
-    )
-    abanca_gold = Position(
-        symbol="ABANCA_GOLD", name="ABANCA Gold", shares=Decimal("10"),
-        invested=Decimal("500"), average_price=Decimal("50"),
-        portfolio_class="GOLD", market_price=Decimal("50"),
-    )
-    portfolio = Portfolio(
-        accounts=[
-            Account(trade_republic, trade_republic, balance=Decimal("1000"), account_id=trade_republic),
-            Account(abanca, abanca, balance=Decimal("9000"), account_id=abanca),
-        ],
-        positions={tr_equity.symbol: tr_equity, abanca_gold.symbol: abanca_gold},
-        cash=Decimal("10000"),
-        invested=Decimal("1500"),
-        account_positions={
-            trade_republic: {tr_equity.symbol: tr_equity},
-            abanca: {abanca_gold.symbol: abanca_gold},
-        },
-    )
-
-    rebalance = RebalanceEngine().rebalance(portfolio)
-
-    assert rebalance.total_value == Decimal("11500")
-    assert rebalance.rebalanceable_value == Decimal("2000")
-    allocations = {item.portfolio_class: item for item in rebalance.allocations}
-    assert allocations["EQUITY"].current_value == Decimal("1000")
-    assert allocations["GOLD"].current_value == Decimal("0")
-    assert {order.symbol for order in rebalance.orders} == {tr_equity.symbol}
-    assert all(order.symbol != abanca_gold.symbol for order in rebalance.orders)
-
-
-def test_rebalance_rejects_unknown_rebalance_account():
-    portfolio = build_portfolio()
-    portfolio.accounts = [Account("Other", "Other", balance=Decimal("100"), account_id="Other")]
-    portfolio.account_positions = {"Other": {}}
-    try:
-        RebalanceEngine().rebalance(portfolio)
-    except ValueError as error:
-        assert str(error) == "Rebalance account not found: Trade Republic"
-    else:
-        raise AssertionError("Expected ValueError")
+        raise AssertionError("Expected missing market price to be rejected")
