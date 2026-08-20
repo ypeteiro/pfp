@@ -5,6 +5,8 @@ from pfp.importers.trade_republic import TradeRepublicImporter
 from datetime import date, datetime, timezone
 from decimal import Decimal
 
+from pfp.domain.account_opening_balance import AccountOpeningBalance
+from pfp.domain.account_transfer import AccountTransfer
 from pfp.domain.movement import Movement
 from pfp.domain.investment import Investment
 from pfp.domain.portfolio import Portfolio
@@ -337,3 +339,74 @@ def test_build_applies_multiple_persisted_investments_once_each():
     assert position.shares == Decimal("5")
     assert position.invested == Decimal("560")
     assert position.average_price == Decimal("112")
+
+
+def test_multi_account_same_asset_consolidates_positions_without_cross_account_contamination():
+    movements = [
+        _movement(account_id="A", amount=Decimal("1000")),
+        _movement(account_id="B", amount=Decimal("1000")),
+        _movement(account_id="A", type="BUY", asset_class="ETF", name="Test ETF", symbol="TEST", shares=Decimal("4"), price=Decimal("100"), amount=Decimal("-400"), transaction_id="buy-a"),
+        _movement(account_id="B", type="BUY", asset_class="ETF", name="Test ETF", symbol="TEST", shares=Decimal("6"), price=Decimal("100"), amount=Decimal("-600"), transaction_id="buy-b"),
+    ]
+    portfolio = PortfolioEngine().build(movements)
+
+    assert portfolio.positions["TEST"].shares == Decimal("10")
+    assert portfolio.positions["TEST"].invested == Decimal("1000")
+    assert portfolio.account_positions["A"]["TEST"].shares == Decimal("4")
+    assert portfolio.account_positions["B"]["TEST"].shares == Decimal("6")
+    assert sum((position.shares for positions in portfolio.account_positions.values() for position in positions.values() if position.symbol == "TEST"), Decimal("0")) == Decimal("10")
+
+
+def test_multi_account_sale_only_reduces_the_account_holding_the_shares():
+    movements = [
+        _movement(account_id="A", amount=Decimal("1000")),
+        _movement(account_id="B", amount=Decimal("1000")),
+        _movement(account_id="A", type="BUY", asset_class="ETF", name="Test ETF", symbol="TEST", shares=Decimal("4"), price=Decimal("100"), amount=Decimal("-400"), transaction_id="buy-a"),
+        _movement(account_id="B", type="BUY", asset_class="ETF", name="Test ETF", symbol="TEST", shares=Decimal("6"), price=Decimal("100"), amount=Decimal("-600"), transaction_id="buy-b"),
+        _movement(account_id="A", type="SELL", asset_class="ETF", name="Test ETF", symbol="TEST", shares=Decimal("2"), price=Decimal("150"), amount=Decimal("300"), transaction_id="sell-a"),
+    ]
+    portfolio = PortfolioEngine().build(movements)
+
+    assert portfolio.positions["TEST"].shares == Decimal("8")
+    assert portfolio.account_positions["A"]["TEST"].shares == Decimal("2")
+    assert portfolio.account_positions["B"]["TEST"].shares == Decimal("6")
+    balances = {account.account_id: account.balance for account in portfolio.accounts}
+    assert balances == {"A": Decimal("900"), "B": Decimal("400")}
+    assert portfolio.cash == Decimal("1300")
+
+
+def test_account_transfer_preserves_consolidated_cash_and_updates_both_accounts():
+    opening_balances = [
+        AccountOpeningBalance("A", date(2026, 8, 1), Decimal("1000")),
+        AccountOpeningBalance("B", date(2026, 8, 1), Decimal("500")),
+    ]
+    transfers = [
+        AccountTransfer(datetime(2026, 8, 2, tzinfo=timezone.utc), "A", "B", Decimal("300"), "EUR"),
+    ]
+    portfolio = PortfolioEngine().build([], opening_balances=opening_balances, account_transfers=transfers)
+
+    balances = {account.account_id: account.balance for account in portfolio.accounts}
+    assert balances == {"A": Decimal("700"), "B": Decimal("800")}
+    assert portfolio.cash == Decimal("1500")
+    assert portfolio.cash == sum(balances.values(), Decimal("0"))
+
+
+def test_multi_account_cash_invariant_matches_account_balances_after_trading():
+    movements = [
+        _movement(account_id="A", amount=Decimal("1000")),
+        _movement(account_id="B", amount=Decimal("2000")),
+        _movement(account_id="A", type="BUY", asset_class="ETF", name="Test ETF", symbol="TEST", shares=Decimal("5"), price=Decimal("100"), amount=Decimal("-500"), transaction_id="buy-a"),
+        _movement(account_id="B", type="BUY", asset_class="ETF", name="Test ETF", symbol="TEST", shares=Decimal("10"), price=Decimal("100"), amount=Decimal("-1000"), transaction_id="buy-b"),
+        _movement(account_id="B", type="SELL", asset_class="ETF", name="Test ETF", symbol="TEST", shares=Decimal("2"), price=Decimal("120"), amount=Decimal("240"), transaction_id="sell-b"),
+    ]
+    portfolio = PortfolioEngine().build(movements)
+
+    balances = [account.balance for account in portfolio.accounts]
+    assert portfolio.cash == sum(balances, Decimal("0"))
+    assert portfolio.invested == sum(position.invested for position in portfolio.positions.values())
+    assert portfolio.positions["TEST"].shares == sum(
+        position.shares
+        for positions in portfolio.account_positions.values()
+        for position in positions.values()
+        if position.symbol == "TEST"
+    )
