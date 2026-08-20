@@ -1,6 +1,6 @@
 """Presentation helpers for the PFP dashboard v2."""
 
-from datetime import date, datetime
+from datetime import datetime
 from decimal import Decimal
 from html import escape
 
