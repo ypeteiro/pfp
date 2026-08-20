@@ -15,6 +15,7 @@ class SaleRepository:
         "price",
         "broker",
         "operation_id",
+        "account_id",
     )
 
     def __init__(self, path):
@@ -35,6 +36,7 @@ class SaleRepository:
                     price=Decimal(row["price"]),
                     broker=row["broker"],
                     operation_id=row.get("operation_id") or None,
+                    account_id=row.get("account_id") or None,
                 )
                 for row in reader
             ]
@@ -51,6 +53,7 @@ class SaleRepository:
             writer.writeheader()
             for row in rows:
                 row["operation_id"] = row.get("operation_id") or ""
+                row["account_id"] = row.get("account_id") or ""
                 writer.writerow({field: row.get(field, "") for field in self.FIELDNAMES})
 
     def exists_by_operation_id(self, operation_id: str) -> bool:
@@ -81,5 +84,6 @@ class SaleRepository:
                     "price": str(sale.price),
                     "broker": sale.broker,
                     "operation_id": sale.operation_id or "",
+                    "account_id": sale.account_id or "",
                 }
             )
