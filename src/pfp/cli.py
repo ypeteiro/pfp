@@ -25,6 +25,7 @@ DEFAULT_SALES_FILE = "data/imports/sales.csv"
 DEFAULT_SNAPSHOTS_FILE = "data/imports/snapshots.csv"
 DEFAULT_OPENING_BALANCES_FILE = "data/accounts/abanca_ahorro_opening_balance.csv"
 DEFAULT_ACCOUNT_TRANSFERS_FILE = "data/accounts/account_transfers.csv"
+DEFAULT_ACCOUNT_ID = "Trade Republic"
 
 
 def build_parser():
@@ -57,12 +58,14 @@ def build_parser():
     invest_parser.add_argument("movements_file")
     invest_parser.add_argument("--investments-file", default=DEFAULT_INVESTMENTS_FILE)
     invest_parser.add_argument("--sales-file", default=DEFAULT_SALES_FILE)
+    invest_parser.add_argument("--account-id", default=DEFAULT_ACCOUNT_ID)
     invest_order_parser = subparsers.add_parser("invest-order", help="Execute an investment order at the current market price")
     invest_order_parser.add_argument("symbol")
     invest_order_parser.add_argument("amount", type=Decimal)
     invest_order_parser.add_argument("movements_file")
     invest_order_parser.add_argument("--investments-file", default=DEFAULT_INVESTMENTS_FILE)
     invest_order_parser.add_argument("--sales-file", default=DEFAULT_SALES_FILE)
+    invest_order_parser.add_argument("--account-id", default=DEFAULT_ACCOUNT_ID)
     sell_parser = subparsers.add_parser("sell", help="Register an executed sale")
     sell_parser.add_argument("symbol")
     sell_parser.add_argument("shares", type=Decimal)
@@ -70,6 +73,7 @@ def build_parser():
     sell_parser.add_argument("movements_file")
     sell_parser.add_argument("--investments-file", default=DEFAULT_INVESTMENTS_FILE)
     sell_parser.add_argument("--sales-file", default=DEFAULT_SALES_FILE)
+    sell_parser.add_argument("--account-id", default=DEFAULT_ACCOUNT_ID)
     return parser
 
 
@@ -236,8 +240,8 @@ def run_rebalance(movements_file, investments_file=DEFAULT_INVESTMENTS_FILE, sal
     print()
 
 
-def run_invest(symbol, shares, amount, portfolio_class, movements_file, investments_file, sales_file=DEFAULT_SALES_FILE, operation_id=None):
-    investment = InvestmentEngine().create(symbol=symbol, shares=shares, amount=amount, portfolio_class=portfolio_class, datetime=datetime.now(timezone.utc))
+def run_invest(symbol, shares, amount, portfolio_class, movements_file, investments_file, sales_file=DEFAULT_SALES_FILE, operation_id=None, account_id=DEFAULT_ACCOUNT_ID):
+    investment = InvestmentEngine().create(symbol=symbol, shares=shares, amount=amount, portfolio_class=portfolio_class, datetime=datetime.now(timezone.utc), account_id=account_id)
     investment = replace(investment, operation_id=operation_id)
     InvestmentRepository(investments_file).save(investment)
     portfolio = load_portfolio(movements_file, investments_file, sales_file)
@@ -247,6 +251,7 @@ def run_invest(symbol, shares, amount, portfolio_class, movements_file, investme
     print()
     print(f"Activo       : {investment.symbol}")
     print(f"Clase        : {investment.portfolio_class}")
+    print(f"Cuenta       : {investment.account_id}")
     print(f"Participaciones : {investment.shares}")
     print(f"Importe      : {investment.amount:.2f} €")
     print(f"Precio       : {investment.price:.2f} €")
@@ -258,7 +263,7 @@ def run_invest(symbol, shares, amount, portfolio_class, movements_file, investme
     print()
 
 
-def run_invest_order(symbol, amount, movements_file, investments_file, price_provider=None, sales_file=DEFAULT_SALES_FILE, operation_id=None):
+def run_invest_order(symbol, amount, movements_file, investments_file, price_provider=None, sales_file=DEFAULT_SALES_FILE, operation_id=None, account_id=DEFAULT_ACCOUNT_ID):
     amount = Decimal(str(amount))
     if amount <= 0:
         raise ValueError("Amount must be greater than zero")
@@ -272,10 +277,10 @@ def run_invest_order(symbol, amount, movements_file, investments_file, price_pro
     if price is None:
         raise ValueError(f"Market price is not available for {symbol}")
     shares = amount / price
-    run_invest(symbol, shares, amount, position.portfolio_class, movements_file, investments_file, sales_file, operation_id)
+    run_invest(symbol, shares, amount, position.portfolio_class, movements_file, investments_file, sales_file, operation_id, account_id)
 
 
-def run_sell(symbol, shares, amount, movements_file, sales_file=DEFAULT_SALES_FILE, investments_file=DEFAULT_INVESTMENTS_FILE, operation_id=None):
+def run_sell(symbol, shares, amount, movements_file, sales_file=DEFAULT_SALES_FILE, investments_file=DEFAULT_INVESTMENTS_FILE, operation_id=None, account_id=DEFAULT_ACCOUNT_ID):
     shares = Decimal(str(shares))
     amount = Decimal(str(amount))
     if shares <= 0:
@@ -288,7 +293,7 @@ def run_sell(symbol, shares, amount, movements_file, sales_file=DEFAULT_SALES_FI
         raise ValueError("Symbol is not present in portfolio")
     if shares > position.shares:
         raise ValueError("Insufficient shares")
-    sale = Sale(datetime=datetime.now(timezone.utc), symbol=symbol, shares=shares, amount=amount, price=amount / shares, operation_id=operation_id)
+    sale = Sale(datetime=datetime.now(timezone.utc), symbol=symbol, shares=shares, amount=amount, price=amount / shares, operation_id=operation_id, account_id=account_id)
     SaleRepository(sales_file).save(sale)
     portfolio = load_portfolio(movements_file, investments_file, sales_file)
     position = portfolio.positions.get(symbol)
@@ -296,6 +301,7 @@ def run_sell(symbol, shares, amount, movements_file, sales_file=DEFAULT_SALES_FI
     print("========== VENTA REGISTRADA ==========")
     print()
     print(f"Activo          : {sale.symbol}")
+    print(f"Cuenta          : {sale.account_id}")
     print(f"Participaciones : {sale.shares}")
     print(f"Importe         : {sale.amount:.2f} €")
     print(f"Precio          : {sale.price:.2f} €")
@@ -321,12 +327,8 @@ def main():
     elif args.command == "rebalance":
         run_rebalance(args.movements_file, args.investments_file, args.sales_file, execute=args.execute)
     elif args.command == "invest":
-        run_invest(args.symbol, args.shares, args.amount, args.portfolio_class, args.movements_file, args.investments_file, args.sales_file)
+        run_invest(args.symbol, args.shares, args.amount, args.portfolio_class, args.movements_file, args.investments_file, args.sales_file, account_id=args.account_id)
     elif args.command == "invest-order":
-        run_invest_order(args.symbol, args.amount, args.movements_file, args.investments_file, sales_file=args.sales_file)
+        run_invest_order(args.symbol, args.amount, args.movements_file, args.investments_file, sales_file=args.sales_file, account_id=args.account_id)
     elif args.command == "sell":
-        run_sell(args.symbol, args.shares, args.amount, args.movements_file, args.sales_file, args.investments_file)
-
-
-if __name__ == "__main__":
-    main()
+        run_sell(args.symbol, args.shares, args.amount, args.movements_file, args.sales_file, args.investments_file, account_id=args.account_id)
