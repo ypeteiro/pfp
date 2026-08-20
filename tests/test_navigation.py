@@ -4,6 +4,7 @@ from pfp.web.navigation import NAVIGATION, navigation_html
 def test_navigation_contains_main_sections():
     assert [item.label for item in NAVIGATION] == [
         "Dashboard",
+        "Cuentas",
         "Posiciones",
         "Movimientos",
         "Asignación",
