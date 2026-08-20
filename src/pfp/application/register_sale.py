@@ -17,6 +17,7 @@ class RegisterSaleRequest:
     price: Decimal
     broker: str = "Trade Republic"
     operation_id: str | None = None
+    account_id: str | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.datetime, datetime):
@@ -33,6 +34,8 @@ class RegisterSaleRequest:
             raise ValueError("Sale broker cannot be empty")
         if self.operation_id is not None and not self.operation_id.strip():
             raise ValueError("Sale operation_id cannot be empty")
+        if self.account_id is not None and not self.account_id.strip():
+            raise ValueError("Sale account_id cannot be empty")
 
 
 class RegisterSale:
@@ -47,6 +50,7 @@ class RegisterSale:
             price=request.price,
             broker=request.broker,
             operation_id=request.operation_id,
+            account_id=request.account_id,
         )
         portfolio.add_sale(sale)
         return sale
