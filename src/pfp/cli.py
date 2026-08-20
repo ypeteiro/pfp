@@ -35,6 +35,10 @@ def build_parser():
     import_tr_parser.add_argument("csv_file")
     portfolio_parser = subparsers.add_parser("portfolio", help="Build and value a portfolio")
     portfolio_parser.add_argument("movements_file")
+    accounts_parser = subparsers.add_parser("accounts", help="Show cash and invested cost by account")
+    accounts_parser.add_argument("movements_file")
+    accounts_parser.add_argument("--investments-file", default=DEFAULT_INVESTMENTS_FILE)
+    accounts_parser.add_argument("--sales-file", default=DEFAULT_SALES_FILE)
     snapshot_parser = subparsers.add_parser("snapshot", help="Persist the current portfolio state")
     snapshot_parser.add_argument("movements_file")
     snapshot_parser.add_argument("--snapshots-file", default=DEFAULT_SNAPSHOTS_FILE)
@@ -104,6 +108,22 @@ def run_portfolio(movements_file):
     prices = price_provider.get_prices(list(portfolio.positions.keys()))
     portfolio = portfolio_engine.build(movements, prices, investments=investments, sales=sales, opening_balances=opening_balances, account_transfers=account_transfers)
     print_portfolio(portfolio)
+
+
+def run_accounts(movements_file, investments_file=DEFAULT_INVESTMENTS_FILE, sales_file=DEFAULT_SALES_FILE):
+    portfolio = load_portfolio(movements_file, investments_file, sales_file)
+    print()
+    print("========== CUENTAS ==========")
+    print()
+    print(f"{'Cuenta':<24}{'Moneda':<9}{'Efectivo':>14}{'Coste invertido':>18}")
+    print("-" * 65)
+    for account in sorted(portfolio.accounts, key=lambda item: item.id):
+        account_positions = portfolio.account_positions.get(account.id, {})
+        invested = sum((position.invested for position in account_positions.values()), Decimal("0"))
+        print(f"{account.id:<24}{account.currency:<9}{account.balance:>14.2f} €{invested:>17.2f} €")
+    print("-" * 65)
+    print(f"{'TOTAL':<24}{'EUR':<9}{portfolio.cash:>14.2f} €{portfolio.invested:>17.2f} €")
+    print()
 
 
 def run_snapshot(movements_file, snapshots_file=DEFAULT_SNAPSHOTS_FILE, investments_file=DEFAULT_INVESTMENTS_FILE, sales_file=DEFAULT_SALES_FILE, price_provider=None):
@@ -322,6 +342,8 @@ def main():
         run_import_tr(args.csv_file)
     elif args.command == "portfolio":
         run_portfolio(args.movements_file)
+    elif args.command == "accounts":
+        run_accounts(args.movements_file, args.investments_file, args.sales_file)
     elif args.command == "snapshot":
         run_snapshot(args.movements_file, args.snapshots_file, args.investments_file, args.sales_file)
     elif args.command == "recommend":
