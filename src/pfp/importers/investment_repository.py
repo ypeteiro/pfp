@@ -17,6 +17,7 @@ class InvestmentRepository:
         "portfolio_class",
         "broker",
         "operation_id",
+        "account_id",
     )
 
     def __init__(self, path):
@@ -40,6 +41,7 @@ class InvestmentRepository:
                         portfolio_class=row["portfolio_class"],
                         broker=row["broker"],
                         operation_id=row.get("operation_id") or None,
+                        account_id=row.get("account_id") or None,
                     )
                 )
         return investments
@@ -56,6 +58,7 @@ class InvestmentRepository:
             writer.writeheader()
             for row in rows:
                 row["operation_id"] = row.get("operation_id") or ""
+                row["account_id"] = row.get("account_id") or ""
                 writer.writerow({field: row.get(field, "") for field in self.FIELDNAMES})
 
     def exists_by_operation_id(self, operation_id: str) -> bool:
@@ -91,5 +94,6 @@ class InvestmentRepository:
                     "portfolio_class": investment.portfolio_class,
                     "broker": investment.broker,
                     "operation_id": investment.operation_id or "",
+                    "account_id": investment.account_id or "",
                 }
             )
