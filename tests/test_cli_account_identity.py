@@ -48,6 +48,33 @@ def test_run_invest_order_persists_account_identity(tmp_path):
     assert investment.account_id == "ABANCA_AHORRO"
 
 
+def test_run_invest_order_is_idempotent_for_same_operation_id(tmp_path):
+    investments_file = tmp_path / "investments.csv"
+    sales_file = tmp_path / "sales.csv"
+
+    class StubPriceProvider:
+        def get_prices(self, symbols):
+            return {"TEST": Decimal("100")}
+
+    kwargs = dict(
+        symbol="TEST",
+        amount=Decimal("300"),
+        movements_file=MOVEMENTS_FILE,
+        investments_file=investments_file,
+        price_provider=StubPriceProvider(),
+        sales_file=sales_file,
+        account_id="Trade Republic",
+        operation_id="rebalance:Trade Republic:TEST:BUY",
+    )
+
+    run_invest_order(**kwargs)
+    run_invest_order(**kwargs)
+
+    investments = InvestmentRepository(investments_file).load()
+    assert len(investments) == 1
+    assert investments[0].operation_id == kwargs["operation_id"]
+
+
 def test_run_sell_persists_account_identity(tmp_path):
     sales_file = tmp_path / "sales.csv"
     investments_file = tmp_path / "investments.csv"
