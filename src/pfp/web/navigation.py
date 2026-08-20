@@ -13,6 +13,7 @@ class NavigationItem:
 
 NAVIGATION = (
     NavigationItem("Dashboard", "/"),
+    NavigationItem("Cuentas", "/accounts"),
     NavigationItem("Posiciones", "/positions"),
     NavigationItem("Movimientos", "/movements"),
     NavigationItem("Asignación", "/allocation"),
