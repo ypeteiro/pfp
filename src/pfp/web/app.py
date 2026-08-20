@@ -51,7 +51,7 @@ class WebApp:
         return self._layout(content, route)
 
     def _layout(self, content: str, path: str) -> str:
-        return f'''<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PFP</title><style>{CSS}</style></head><body><header><div><strong>PFP</strong><span>Personal Finance Portfolio</span></div><div class="header-actions">{navigation_html(path)}</div></header><main>{content}</main><footer class="app-footer"><a href="{navigation_html.__module__}">Ayuda</a></footer></body></html>'''
+        return f'''<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PFP</title><style>{CSS}</style></head><body><header><div><strong>PFP</strong><span>Personal Finance Portfolio</span></div><div class="header-actions">{navigation_html(path)}</div></header><main>{content}</main><footer class="app-footer"><a href="https://github.com/ypeteiro/pfp#readme" target="_blank" rel="noopener noreferrer">Ayuda y documentación (README)</a></footer></body></html>'''
 
     def _dashboard(self, sort: str = "weight", direction: str = "desc") -> str:
         return dashboard_v2_html(self.report, sort, direction)
