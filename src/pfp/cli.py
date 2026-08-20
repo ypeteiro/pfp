@@ -49,6 +49,7 @@ def build_parser():
     rebalance_parser.add_argument("movements_file")
     rebalance_parser.add_argument("--investments-file", default=DEFAULT_INVESTMENTS_FILE)
     rebalance_parser.add_argument("--sales-file", default=DEFAULT_SALES_FILE)
+    rebalance_parser.add_argument("--account-id", default=DEFAULT_ACCOUNT_ID)
     rebalance_parser.add_argument("--execute", action="store_true", help="Persist the calculated rebalance orders")
     invest_parser = subparsers.add_parser("invest", help="Register an executed investment")
     invest_parser.add_argument("symbol")
@@ -170,7 +171,7 @@ def run_recommend(amount, movements_file, investments_file=DEFAULT_INVESTMENTS_F
     print()
 
 
-def _build_rebalance(movements_file, investments_file, sales_file, price_provider):
+def _build_rebalance(movements_file, investments_file, sales_file, price_provider, account_id=DEFAULT_ACCOUNT_ID):
     portfolio = load_portfolio(movements_file, investments_file, sales_file)
     prices = price_provider.get_prices(list(portfolio.positions.keys()))
     movements = TradeRepublicImporter().load(movements_file)
@@ -179,34 +180,35 @@ def _build_rebalance(movements_file, investments_file, sales_file, price_provide
     opening_balances = AccountOpeningBalanceRepository(DEFAULT_OPENING_BALANCES_FILE).load()
     account_transfers = AccountTransferRepository(DEFAULT_ACCOUNT_TRANSFERS_FILE).load()
     portfolio = PortfolioEngine().build(movements, prices, investments=investments, sales=sales, opening_balances=opening_balances, account_transfers=account_transfers)
-    return RebalanceEngine().rebalance(portfolio)
+    return RebalanceEngine().rebalance(portfolio, account_id=account_id)
 
 
-def _rebalance_operation_id(rebalance, order):
-    payload = "|".join(("rebalance", str(rebalance.total_value), order.action, order.symbol, order.portfolio_class, str(order.amount), str(order.shares)))
+def _rebalance_operation_id(rebalance, order, account_id=DEFAULT_ACCOUNT_ID):
+    payload = "|".join(("rebalance", account_id, str(rebalance.total_value), order.action, order.symbol, order.portfolio_class, str(order.amount), str(order.shares)))
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
-def _execute_rebalance(rebalance, movements_file, investments_file, sales_file, price_provider):
-    current = _build_rebalance(movements_file, investments_file, sales_file, price_provider)
+def _execute_rebalance(rebalance, movements_file, investments_file, sales_file, price_provider, account_id=DEFAULT_ACCOUNT_ID):
+    current = _build_rebalance(movements_file, investments_file, sales_file, price_provider, account_id=account_id)
     if current != rebalance:
         raise ValueError("Portfolio changed since rebalance calculation")
     for order in rebalance.orders:
-        operation_id = _rebalance_operation_id(rebalance, order)
+        operation_id = _rebalance_operation_id(rebalance, order, account_id=account_id)
         if order.action == "SELL":
-            run_sell(order.symbol, order.shares, order.amount, movements_file, sales_file, investments_file, operation_id)
+            run_sell(order.symbol, order.shares, order.amount, movements_file, sales_file, investments_file, operation_id, account_id)
     for order in rebalance.orders:
-        operation_id = _rebalance_operation_id(rebalance, order)
+        operation_id = _rebalance_operation_id(rebalance, order, account_id=account_id)
         if order.action == "BUY":
-            run_invest_order(order.symbol, order.amount, movements_file, investments_file, price_provider, sales_file, operation_id)
+            run_invest_order(order.symbol, order.amount, movements_file, investments_file, price_provider, sales_file, operation_id, account_id)
 
 
-def run_rebalance(movements_file, investments_file=DEFAULT_INVESTMENTS_FILE, sales_file=DEFAULT_SALES_FILE, price_provider=None, execute=False):
+def run_rebalance(movements_file, investments_file=DEFAULT_INVESTMENTS_FILE, sales_file=DEFAULT_SALES_FILE, price_provider=None, execute=False, account_id=DEFAULT_ACCOUNT_ID):
     price_provider = price_provider or CompositePriceProvider()
-    rebalance = _build_rebalance(movements_file, investments_file, sales_file, price_provider)
+    rebalance = _build_rebalance(movements_file, investments_file, sales_file, price_provider, account_id=account_id)
     print()
     print("========== REBALANCEO ==========")
     print()
+    print(f"Cuenta rebalanceada     : {account_id}")
     print(f"Patrimonio total        : {rebalance.total_value:.2f} €")
     print(f"Patrimonio rebalanceable: {rebalance.rebalanceable_value:.2f} €")
     excluded_value = rebalance.total_value - rebalance.rebalanceable_value
@@ -227,16 +229,16 @@ def run_rebalance(movements_file, investments_file=DEFAULT_INVESTMENTS_FILE, sal
             print(f"{order.action:<5}" f" {order.symbol:<18}" f" {order.amount:10.2f} €" f" ({order.portfolio_class})")
         print()
         if execute:
-            _execute_rebalance(rebalance, movements_file, investments_file, sales_file, price_provider)
+            _execute_rebalance(rebalance, movements_file, investments_file, sales_file, price_provider, account_id=account_id)
             print("Rebalanceo ejecutado y persistido.")
         else:
             print("Comandos ejecutables:")
             print()
             for order in rebalance.orders:
                 if order.action == "BUY":
-                    print("  python -m pfp invest-order " f"{order.symbol} {order.amount:.2f} {movements_file}" f" --investments-file {investments_file}" f" --sales-file {sales_file}")
+                    print("  python -m pfp invest-order " f"{order.symbol} {order.amount:.2f} {movements_file}" f" --investments-file {investments_file}" f" --sales-file {sales_file}" f" --account-id {account_id}")
                 else:
-                    print("  python -m pfp sell " f"{order.symbol} {order.shares} {order.amount:.2f} {movements_file}" f" --investments-file {investments_file}" f" --sales-file {sales_file}")
+                    print("  python -m pfp sell " f"{order.symbol} {order.shares} {order.amount:.2f} {movements_file}" f" --investments-file {investments_file}" f" --sales-file {sales_file}" f" --account-id {account_id}")
     print()
 
 
@@ -325,7 +327,7 @@ def main():
     elif args.command == "recommend":
         run_recommend(args.amount, args.movements_file, args.investments_file, args.sales_file)
     elif args.command == "rebalance":
-        run_rebalance(args.movements_file, args.investments_file, args.sales_file, execute=args.execute)
+        run_rebalance(args.movements_file, args.investments_file, args.sales_file, execute=args.execute, account_id=args.account_id)
     elif args.command == "invest":
         run_invest(args.symbol, args.shares, args.amount, args.portfolio_class, args.movements_file, args.investments_file, args.sales_file, account_id=args.account_id)
     elif args.command == "invest-order":
