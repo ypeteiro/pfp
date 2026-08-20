@@ -13,6 +13,7 @@ class InvestmentEngine:
         portfolio_class,
         datetime,
         broker="Trade Republic",
+        account_id=None,
     ):
         shares = Decimal(str(shares))
         amount = Decimal(str(amount))
@@ -47,4 +48,5 @@ class InvestmentEngine:
             price=price,
             portfolio_class=portfolio_class,
             broker=broker,
+            account_id=account_id,
         )
