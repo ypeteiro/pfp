@@ -54,17 +54,17 @@ def test_run_invest_order_is_idempotent_for_same_operation_id(tmp_path):
 
     class StubPriceProvider:
         def get_prices(self, symbols):
-            return {"TEST": Decimal("100")}
+            return {"IE00BG47KH54": Decimal("120")}
 
     kwargs = dict(
-        symbol="TEST",
+        symbol="IE00BG47KH54",
         amount=Decimal("300"),
         movements_file=MOVEMENTS_FILE,
         investments_file=investments_file,
         price_provider=StubPriceProvider(),
         sales_file=sales_file,
         account_id="Trade Republic",
-        operation_id="rebalance:Trade Republic:TEST:BUY",
+        operation_id="rebalance:Trade Republic:IE00BG47KH54:BUY",
     )
 
     run_invest_order(**kwargs)
