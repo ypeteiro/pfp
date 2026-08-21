@@ -22,18 +22,26 @@ def _prices(symbols):
     }
 
 
+def _set_market_prices(portfolio):
+    prices = _prices(portfolio.positions)
+    for position in portfolio.positions.values():
+        position.market_price = prices.get(position.symbol)
+    for account_positions in portfolio.account_positions.values():
+        for position in account_positions.values():
+            position.market_price = prices.get(position.symbol)
+
+
 def test_real_trade_republic_fixture_builds_account_scoped_portfolio():
     portfolio = load_portfolio(MOVEMENTS_FILE, None, None)
 
-    assert [account.account_id for account in portfolio.accounts] == ["Trade Republic"]
+    assert {account.account_id for account in portfolio.accounts} == {"Trade Republic", "ABANCA_AHORRO"}
     assert "Trade Republic" in portfolio.account_positions
     assert portfolio.account_positions["Trade Republic"]
 
 
 def test_real_trade_republic_fixture_rebalance_is_scoped_to_trade_republic():
     portfolio = load_portfolio(MOVEMENTS_FILE, None, None)
-    for position in portfolio.positions.values():
-        position.market_price = _prices([position.symbol]).get(position.symbol)
+    _set_market_prices(portfolio)
 
     rebalance = RebalanceEngine().rebalance(portfolio, account_id="Trade Republic")
 
@@ -44,8 +52,7 @@ def test_real_trade_republic_fixture_rebalance_is_scoped_to_trade_republic():
 
 def test_real_trade_republic_fixture_rebalance_is_stable_when_recalculated():
     portfolio = load_portfolio(MOVEMENTS_FILE, None, None)
-    for position in portfolio.positions.values():
-        position.market_price = _prices([position.symbol]).get(position.symbol)
+    _set_market_prices(portfolio)
 
     engine = RebalanceEngine()
     first = engine.rebalance(portfolio, account_id="Trade Republic")
