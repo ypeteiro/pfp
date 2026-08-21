@@ -44,3 +44,16 @@ def test_trade_republic_cash_reconciles_contributions_less_trading_cash_outflows
     assert portfolio.cash == contributions - trading_cash_outflows
     assert portfolio.invested == trading_cash_outflows
     assert portfolio.cash + portfolio.invested == contributions
+
+
+def test_trade_republic_total_value_reconciles_without_double_counting_fees():
+    importer = TradeRepublicImporter()
+    movements = importer.load(CSV_FILE)
+    portfolio = PortfolioEngine().build(movements)
+
+    for position in portfolio.positions.values():
+        position.market_price = position.average_price
+
+    assert portfolio.market_value == portfolio.invested
+    assert portfolio.total_value == Decimal("25000")
+    assert portfolio.unrealized_gain_loss == Decimal("0")
