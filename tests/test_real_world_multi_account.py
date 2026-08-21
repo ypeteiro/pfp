@@ -48,12 +48,12 @@ def test_trade_republic_rebuild_with_external_account_and_transfer_preserves_tot
     assert set(portfolio.account_positions["Trade Republic"]) == {
         "BTC",
         "IE00B03HD191",
-        "IE00B04L5Y983",
-        "IE00B05BMR087",
+        "IE00B4L5Y983",
+        "IE00B5BMR087",
         "IE00BKM4GZ66",
         "IE00BK5BQT80",
         "IE00BG47KH54",
         "IE00B4ND3602",
         "IE000I1Q42S9",
-    } - {"IE00B04L5Y983", "IE00B05BMR087"} | {"IE00B4L5Y983", "IE00B5BMR087"}
+    }
     assert portfolio.account_positions["ABANCA_AHORRO"] == {}
