@@ -6,6 +6,7 @@ from pfp.domain.account import Account
 from pfp.domain.portfolio import Portfolio
 from pfp.domain.position import Position
 from pfp.engine.rebalance_engine import RebalanceEngine
+from pfp.web.rebalance_ui import rebalance_html
 
 
 def _portfolio():
@@ -41,3 +42,13 @@ def test_rebalance_engine_accepts_account_selected_by_web_flow():
 def test_rebalance_rejects_unknown_account():
     with pytest.raises(ValueError, match="Rebalance account not found: Missing"):
         RebalanceEngine().rebalance(_portfolio(), account_id="Missing")
+
+
+def test_rebalance_html_selects_account_and_only_shows_its_positions():
+    html = rebalance_html(_portfolio(), "Trade Republic")
+
+    assert 'name="account_id"' in html
+    assert 'value="Trade Republic" selected' in html
+    assert "EQUITY" in html
+    assert "BOND" not in html
+    assert "Solo vista previa" in html
