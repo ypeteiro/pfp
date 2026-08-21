@@ -22,6 +22,7 @@ from pfp.importers.sale_repository import SaleRepository
 from pfp.market.price_provider import CompositePriceProvider
 from pfp.reporting.portfolio_report import PortfolioReport
 from pfp.web.app import WebApp
+from pfp.web.rebalance_ui import rebalance_html
 
 DEFAULT_ASSETS_FILE = Path("data/assets.csv")
 
@@ -39,6 +40,9 @@ def _value_portfolio(portfolio: Portfolio, price_provider) -> Portfolio:
     prices = price_provider.get_prices(list(portfolio.positions.keys()))
     for symbol, position in portfolio.positions.items():
         position.market_price = prices.get(symbol)
+    for positions in portfolio.account_positions.values():
+        for symbol, position in positions.items():
+            position.market_price = prices.get(symbol)
     return portfolio
 
 
@@ -162,6 +166,20 @@ def serve(movements_file: Path, host: str = "127.0.0.1", port: int = 8000, inves
                 self.send_response(303)
                 self.send_header("Location", "/")
                 self.end_headers()
+                return
+            if path == "/rebalance" or path.startswith("/rebalance?"):
+                query = parse_qs(path.split("?", 1)[1] if "?" in path else "")
+                account_id = query.get("account_id", [None])[0]
+                try:
+                    body = app._layout(rebalance_html(runtime.portfolio, account_id), "/rebalance").encode("utf-8")
+                except ValueError as exc:
+                    self.send_error(400, str(exc))
+                    return
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
                 return
             try:
                 body = app.render(path).encode("utf-8")
