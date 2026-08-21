@@ -16,6 +16,7 @@ class RebalanceOrder:
     portfolio_class: str
     amount: Decimal
     shares: Decimal | None = None
+    account_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,8 +57,6 @@ class RebalanceEngine:
             for portfolio_class in self.target_allocation
         }
 
-        # The total portfolio remains consolidated. Only the rebalanceable
-        # portion is scoped to the selected account.
         market_value = portfolio.cash
         for position in portfolio.positions.values():
             if position.market_price is None:
@@ -83,8 +82,6 @@ class RebalanceEngine:
             if rebalanceable_cash is None:
                 raise ValueError(f"Rebalance account not found: {account_id}")
         else:
-            # Preserve the legacy single-portfolio contract for callers that
-            # have no account model yet.
             account_positions = portfolio.positions
             rebalanceable_cash = portfolio.cash
 
@@ -149,6 +146,8 @@ class RebalanceEngine:
                         asset_name=selected_position.name,
                         portfolio_class=portfolio_class,
                         amount=difference_value,
+                        shares=difference_value / selected_position.market_price,
+                        account_id=account_id,
                     )
                 )
             else:
@@ -170,6 +169,7 @@ class RebalanceEngine:
                             portfolio_class=portfolio_class,
                             amount=amount,
                             shares=shares,
+                            account_id=account_id,
                         )
                     )
                     remaining -= amount
