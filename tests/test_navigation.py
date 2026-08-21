@@ -8,7 +8,9 @@ def test_navigation_contains_main_sections():
         "Posiciones",
         "Movimientos",
         "Asignación",
+        "Rebalanceo",
     ]
+    assert any(item.path == "/rebalance" for item in NAVIGATION)
 
 
 def test_operations_are_grouped_in_dropdown_without_refresh():
