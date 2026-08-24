@@ -196,11 +196,10 @@ def test_run_sell_persists_sale_and_updates_portfolio(tmp_path):
     assert sales[0].symbol == "IE00B4L5Y983"
 
 
-
 def test_run_reconcile_prints_reconciled_accounts(tmp_path, capsys):
     expected_file = tmp_path / "expected.csv"
     expected_file.write_text(
-        "account_id,expected_balance\nABANCA_AHORRO,31179.70\nTRADE_REPUBLIC,2840.29\n",
+        "account_id,expected_balance\nABANCA_AHORRO,31179.70\nTrade Republic,2840.29\n",
         encoding="utf-8",
     )
 
@@ -209,21 +208,21 @@ def test_run_reconcile_prints_reconciled_accounts(tmp_path, capsys):
 
     assert "CONCILIACIÓN" in output
     assert "ABANCA_AHORRO" in output
-    assert "TRADE_REPUBLIC" in output
+    assert "Trade Republic" in output
     assert "RECONCILED" in output
 
 
 def test_run_reconcile_reports_mismatch(tmp_path, capsys):
     expected_file = tmp_path / "expected.csv"
     expected_file.write_text(
-        "account_id,expected_balance\nTRADE_REPUBLIC,3040.29\n",
+        "account_id,expected_balance\nTrade Republic,3040.29\n",
         encoding="utf-8",
     )
 
     run_reconcile(MOVEMENTS_FILE, expected_file)
     output = capsys.readouterr().out
 
-    assert "TRADE_REPUBLIC" in output
+    assert "Trade Republic" in output
     assert "MISMATCH" in output
     assert "200.00" in output
 
@@ -231,12 +230,12 @@ def test_run_reconcile_reports_mismatch(tmp_path, capsys):
 def test_run_reconcile_uses_expected_balance_csv(tmp_path):
     expected_file = tmp_path / "expected.csv"
     expected_file.write_text(
-        "account_id,expected_balance\nTRADE_REPUBLIC,3040.29\n",
+        "account_id,expected_balance\nTrade Republic,3040.29\n",
         encoding="utf-8",
     )
 
     reconciliations = run_reconcile(MOVEMENTS_FILE, expected_file)
 
     assert len(reconciliations) == 1
-    assert reconciliations[0].account_id == "TRADE_REPUBLIC"
+    assert reconciliations[0].account_id == "Trade Republic"
     assert reconciliations[0].difference == Decimal("-200")
