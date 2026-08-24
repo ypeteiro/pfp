@@ -200,7 +200,7 @@ def test_run_sell_persists_sale_and_updates_portfolio(tmp_path):
 def test_run_reconcile_prints_reconciled_accounts(tmp_path, capsys):
     expected_file = tmp_path / "expected.csv"
     expected_file.write_text(
-        "account_id,expected_balance\\nABANCA_AHORRO,31179.70\\nTRADE_REPUBLIC,2840.29\\n",
+        "account_id,expected_balance\nABANCA_AHORRO,31179.70\nTRADE_REPUBLIC,2840.29\n",
         encoding="utf-8",
     )
 
@@ -216,7 +216,7 @@ def test_run_reconcile_prints_reconciled_accounts(tmp_path, capsys):
 def test_run_reconcile_reports_mismatch(tmp_path, capsys):
     expected_file = tmp_path / "expected.csv"
     expected_file.write_text(
-        "account_id,expected_balance\\nTRADE_REPUBLIC,3040.29\\n",
+        "account_id,expected_balance\nTRADE_REPUBLIC,3040.29\n",
         encoding="utf-8",
     )
 
@@ -231,7 +231,7 @@ def test_run_reconcile_reports_mismatch(tmp_path, capsys):
 def test_run_reconcile_uses_expected_balance_csv(tmp_path):
     expected_file = tmp_path / "expected.csv"
     expected_file.write_text(
-        "account_id,expected_balance\\nTRADE_REPUBLIC,3040.29\\n",
+        "account_id,expected_balance\nTRADE_REPUBLIC,3040.29\n",
         encoding="utf-8",
     )
 
