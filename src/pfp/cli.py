@@ -42,6 +42,11 @@ def build_parser():
     portfolio_parser = subparsers.add_parser("portfolio", help="Build and value a portfolio")
     portfolio_parser.add_argument("movements_file")
     accounts_parser = subparsers.add_parser("accounts", help="Show cash and invested cost by account")
+    reconcile_parser = subparsers.add_parser("reconcile", help="Reconcile account balances")
+    reconcile_parser.add_argument("movements_file")
+    reconcile_parser.add_argument("expected_balances_file", help="CSV with account_id and expected_balance columns")
+    reconcile_parser.add_argument("--investments-file", default=DEFAULT_INVESTMENTS_FILE)
+    reconcile_parser.add_argument("--sales-file", default=DEFAULT_SALES_FILE)
     accounts_parser.add_argument("movements_file")
     accounts_parser.add_argument("--investments-file", default=DEFAULT_INVESTMENTS_FILE)
     accounts_parser.add_argument("--sales-file", default=DEFAULT_SALES_FILE)
@@ -114,6 +119,23 @@ def run_portfolio(movements_file):
     prices = price_provider.get_prices(list(portfolio.positions.keys()))
     portfolio = portfolio_engine.build(movements, prices, investments=investments, sales=sales, opening_balances=opening_balances, account_transfers=account_transfers)
     print_portfolio(portfolio)
+
+
+def run_reconcile(movements_file, expected_balances_file, investments_file=DEFAULT_INVESTMENTS_FILE, sales_file=DEFAULT_SALES_FILE):
+    import csv
+    from pfp.engine.account_reconciliation_engine import AccountReconciliationEngine
+    portfolio = load_portfolio(movements_file, investments_file, sales_file)
+    with open(expected_balances_file, encoding="utf-8", newline="") as handle:
+        expected = {row["account_id"]: Decimal(row["expected_balance"]) for row in csv.DictReader(handle)}
+    reconciliations = AccountReconciliationEngine.reconcile_portfolio(portfolio, expected)
+    print()
+    print("========== CONCILIACIÓN ==========")
+    print()
+    for item in reconciliations:
+        status = "RECONCILED" if item.is_reconciled else "MISMATCH"
+        print(f"{item.account_id:<24} esperado {item.expected_balance:>12.2f} €  calculado {item.calculated_balance:>12.2f} €  diferencia {item.difference:>10.2f} €  {status}")
+    print()
+    return reconciliations
 
 
 def run_accounts(movements_file, investments_file=DEFAULT_INVESTMENTS_FILE, sales_file=DEFAULT_SALES_FILE):
@@ -357,6 +379,8 @@ def main():
         run_portfolio(args.movements_file)
     elif args.command == "accounts":
         run_accounts(args.movements_file, args.investments_file, args.sales_file)
+    elif args.command == "reconcile":
+        run_reconcile(args.movements_file, args.expected_balances_file, args.investments_file, args.sales_file)
     elif args.command == "snapshot":
         run_snapshot(args.movements_file, args.snapshots_file, args.investments_file, args.sales_file)
     elif args.command == "recommend":
