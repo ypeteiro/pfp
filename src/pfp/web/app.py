@@ -14,6 +14,7 @@ from pfp.web.movements_ui import movements_html
 from pfp.web.investment_ui import investment_form_html
 from pfp.web.navigation import navigation_html
 from pfp.web.positions_ui import positions_html
+from pfp.web.reconciliation_history_ui import reconciliation_history_html
 from pfp.web.sale_ui import sale_form_html
 
 
@@ -21,6 +22,7 @@ from pfp.web.sale_ui import sale_form_html
 class WebApp:
     report: PortfolioReport
     assets: tuple = ()
+    reconciliation_history: tuple = ()
 
     def render(self, path: str) -> str:
         parsed = urlsplit(path)
@@ -28,7 +30,7 @@ class WebApp:
         query = parse_qs(parsed.query)
         sort = query.get("sort", ["weight"])[0]
         direction = query.get("direction", ["desc"])[0]
-        pages = {"/": self._dashboard, "/index.html": self._dashboard, "/accounts": self._accounts, "/positions": self._positions, "/movements": self._movements, "/allocation": self._allocation, "/investments/new": self._investment_form, "/sales/new": self._sale_form, "/assets": self._assets, "/assets/new": self._asset_form}
+        pages = {"/": self._dashboard, "/index.html": self._dashboard, "/accounts": self._accounts, "/positions": self._positions, "/movements": self._movements, "/allocation": self._allocation, "/reconciliation-history": self._reconciliation_history, "/investments/new": self._investment_form, "/sales/new": self._sale_form, "/assets": self._assets, "/assets/new": self._asset_form}
         renderer = pages.get(route)
         if renderer is None:
             raise KeyError(route)
@@ -46,6 +48,8 @@ class WebApp:
             content = self._sale_form()
         elif route == "/assets/new":
             content = self._asset_form()
+        elif route == "/reconciliation-history":
+            content = self._reconciliation_history(query.get("account_id", [None])[0])
         else:
             content = renderer()
         return self._layout(content, route)
@@ -69,6 +73,9 @@ class WebApp:
 
     def _allocation(self) -> str:
         return allocation_html(self.report)
+
+    def _reconciliation_history(self, account_id=None) -> str:
+        return reconciliation_history_html(self.reconciliation_history, account_id)
 
     def _investment_form(self, error: str | None = None, values: dict[str, str] | None = None) -> str:
         return investment_form_html(error=error, values=values, assets=self.assets)

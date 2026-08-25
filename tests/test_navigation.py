@@ -9,8 +9,10 @@ def test_navigation_contains_main_sections():
         "Movimientos",
         "Asignación",
         "Rebalanceo",
+        "Conciliación",
     ]
     assert any(item.path == "/rebalance" for item in NAVIGATION)
+    assert any(item.path == "/reconciliation-history" for item in NAVIGATION)
 
 
 def test_operations_are_grouped_in_dropdown_without_refresh():

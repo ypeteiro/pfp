@@ -18,6 +18,7 @@ NAVIGATION = (
     NavigationItem("Movimientos", "/movements"),
     NavigationItem("Asignación", "/allocation"),
     NavigationItem("Rebalanceo", "/rebalance"),
+    NavigationItem("Conciliación", "/reconciliation-history"),
 )
 
 OPERATIONS = (
