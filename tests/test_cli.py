@@ -1,7 +1,7 @@
 from pathlib import Path
 from decimal import Decimal
 
-from pfp.cli import load_portfolio, run_invest, run_invest_order, run_recommend, run_sell
+from pfp.cli import load_portfolio, run_invest, run_invest_order, run_recommend, run_reconcile, run_sell
 from pfp.engine.recommendation_engine import RecommendationEngine
 from pfp.importers.investment_repository import InvestmentRepository
 from pfp.importers.sale_repository import SaleRepository
@@ -194,3 +194,48 @@ def test_run_sell_persists_sale_and_updates_portfolio(tmp_path):
     sales = SaleRepository(sales_file).load()
     assert len(sales) == 1
     assert sales[0].symbol == "IE00B4L5Y983"
+
+
+def test_run_reconcile_prints_reconciled_accounts(tmp_path, capsys):
+    expected_file = tmp_path / "expected.csv"
+    expected_file.write_text(
+        "account_id,expected_balance\nABANCA_AHORRO,31179.70\nTrade Republic,2840.29\n",
+        encoding="utf-8",
+    )
+
+    run_reconcile(MOVEMENTS_FILE, expected_file)
+    output = capsys.readouterr().out
+
+    assert "CONCILIACIÓN" in output
+    assert "ABANCA_AHORRO" in output
+    assert "Trade Republic" in output
+    assert "RECONCILED" in output
+
+
+def test_run_reconcile_reports_mismatch(tmp_path, capsys):
+    expected_file = tmp_path / "expected.csv"
+    expected_file.write_text(
+        "account_id,expected_balance\nTrade Republic,3040.29\n",
+        encoding="utf-8",
+    )
+
+    run_reconcile(MOVEMENTS_FILE, expected_file)
+    output = capsys.readouterr().out
+
+    assert "Trade Republic" in output
+    assert "MISMATCH" in output
+    assert "200.00" in output
+
+
+def test_run_reconcile_uses_expected_balance_csv(tmp_path):
+    expected_file = tmp_path / "expected.csv"
+    expected_file.write_text(
+        "account_id,expected_balance\nTrade Republic,3040.29\n",
+        encoding="utf-8",
+    )
+
+    reconciliations = run_reconcile(MOVEMENTS_FILE, expected_file)
+
+    assert len(reconciliations) == 1
+    assert reconciliations[0].account_id == "Trade Republic"
+    assert reconciliations[0].difference == Decimal("-200")
