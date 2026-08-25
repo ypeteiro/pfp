@@ -125,21 +125,13 @@ def run_portfolio(movements_file):
     print_portfolio(portfolio)
 
 
-def run_reconcile(
-    movements_file,
-    expected_balances_file,
-    investments_file=DEFAULT_INVESTMENTS_FILE,
-    sales_file=DEFAULT_SALES_FILE,
-    history_file=DEFAULT_RECONCILIATIONS_FILE,
-):
+def run_reconcile(movements_file, expected_balances_file, investments_file=DEFAULT_INVESTMENTS_FILE, sales_file=DEFAULT_SALES_FILE, history_file=DEFAULT_RECONCILIATIONS_FILE):
     import csv
     from pfp.engine.account_reconciliation_engine import AccountReconciliationEngine
-
     portfolio = load_portfolio(movements_file, investments_file, sales_file)
     with open(expected_balances_file, encoding="utf-8", newline="") as handle:
         expected = {row["account_id"]: Decimal(row["expected_balance"]) for row in csv.DictReader(handle)}
     reconciliations = AccountReconciliationEngine.reconcile_portfolio(portfolio, expected)
-
     timestamp = datetime.now(timezone.utc)
     history_repository = AccountReconciliationRepository(history_file)
     for item in reconciliations:
@@ -153,7 +145,6 @@ def run_reconcile(
                 status="RECONCILED" if item.is_reconciled else "MISMATCH",
             )
         )
-
     print()
     print("========== CONCILIACIÓN ==========")
     print()
@@ -296,89 +287,129 @@ def run_rebalance(movements_file, investments_file=DEFAULT_INVESTMENTS_FILE, sal
     print("## ASIGNACIÓN")
     print()
     for allocation in rebalance.allocations:
-        print(f"{allocation.portfolio_class:<16}" f" actual {allocation.current_percent:7.2f} %" f" objetivo {allocation.target_percent:7.2f} %" f" diferencia {allocation.difference:>10.2f} €")
+        print(f"{allocation.portfolio_class:<16}" f" actual {allocation.current_percent:7.2f} %" f" objetivo {allocation.target_percent:7.2f} %" f" diferencia {allocation.difference_percent:7.2f} %")
     print()
     print("## ÓRDENES")
     print()
-    for order in rebalance.orders:
-        print(f"{order.action:<6} {order.symbol:<16} {order.amount:>10.2f} €  {order.shares:>12.6f} títulos")
-    print()
-    if execute:
-        _execute_rebalance(rebalance, movements_file, investments_file, sales_file, price_provider, account_id=account_id)
-        print("Rebalanceo ejecutado.")
+    if not rebalance.orders:
+        print("Portfolio ya rebalanceado.")
+    else:
+        for order in rebalance.orders:
+            print(f"{order.action:<5}" f" {order.symbol:<18}" f" {order.amount:10.2f} €" f" ({order.portfolio_class})")
         print()
-    return rebalance
+        if execute:
+            _execute_rebalance(rebalance, movements_file, investments_file, sales_file, price_provider, account_id=account_id)
+            print("Rebalanceo ejecutado y persistido.")
+        else:
+            print("Comandos ejecutables:")
+            print()
+            for order in rebalance.orders:
+                if order.action == "BUY":
+                    print("  python -m pfp invest-order " f"{order.symbol} {order.amount:.2f} {movements_file}" f" --investments-file {investments_file}" f" --sales-file {sales_file}" f" --account-id {account_id}")
+                else:
+                    print("  python -m pfp sell " f"{order.symbol} {order.shares} {order.amount:.2f} {movements_file}" f" --investments-file {investments_file}" f" --sales-file {sales_file}" f" --account-id {account_id}")
+    print()
 
 
-def run_invest(symbol, shares, amount, portfolio_class, movements_file, investments_file=DEFAULT_INVESTMENTS_FILE, sales_file=DEFAULT_SALES_FILE, operation_id=None, account_id=DEFAULT_ACCOUNT_ID):
+def run_invest(symbol, shares, amount, portfolio_class, movements_file, investments_file, sales_file=DEFAULT_SALES_FILE, operation_id=None, account_id=DEFAULT_ACCOUNT_ID):
     account_id = _validate_account_id(account_id)
-    from pfp.application.register_investment import register_investment
-    investment = register_investment(symbol, shares, amount, portfolio_class, investments_file, operation_id=operation_id, account_id=account_id)
+    investment = InvestmentEngine().create(symbol=symbol, shares=shares, amount=amount, portfolio_class=portfolio_class, datetime=datetime.now(timezone.utc), account_id=account_id)
+    investment = replace(investment, operation_id=operation_id)
+    InvestmentRepository(investments_file).save(investment)
+    portfolio = load_portfolio(movements_file, investments_file, sales_file)
+    position = portfolio.positions.get(symbol)
     print()
     print("========== INVERSIÓN REGISTRADA ==========")
     print()
-    print(f"Activo      : {investment.symbol}")
-    print(f"Participaciones: {investment.shares}")
-    print(f"Importe     : {investment.amount:.2f} €")
-    print(f"Precio      : {investment.price:.2f} €")
-    print(f"Clase       : {investment.portfolio_class}")
-    print(f"Cuenta      : {account_id}")
+    print(f"Activo       : {investment.symbol}")
+    print(f"Clase        : {investment.portfolio_class}")
+    print(f"Cuenta       : {investment.account_id}")
+    print(f"Participaciones : {investment.shares}")
+    print(f"Importe      : {investment.amount:.2f} €")
+    print(f"Precio       : {investment.price:.2f} €")
+    if position is not None:
+        print()
+        print(f"Posición total : {position.shares} participaciones")
+        print(f"Coste total   : {position.invested:.2f} €")
+        print(f"Efectivo      : {portfolio.cash:.2f} €")
     print()
-    return investment
 
 
-def run_invest_order(symbol, amount, movements_file, investments_file=DEFAULT_INVESTMENTS_FILE, price_provider=None, sales_file=DEFAULT_SALES_FILE, operation_id=None, account_id=DEFAULT_ACCOUNT_ID):
+def run_invest_order(symbol, amount, movements_file, investments_file, price_provider=None, sales_file=DEFAULT_SALES_FILE, operation_id=None, account_id=DEFAULT_ACCOUNT_ID):
     account_id = _validate_account_id(account_id)
+    amount = Decimal(str(amount))
+    if amount <= 0:
+        raise ValueError("Amount must be greater than zero")
     portfolio = load_portfolio(movements_file, investments_file, sales_file)
-    if symbol not in portfolio.positions:
+    position = portfolio.positions.get(symbol)
+    if position is None:
         raise ValueError("Symbol is not present in portfolio")
     price_provider = price_provider or CompositePriceProvider()
     prices = price_provider.get_prices([symbol])
-    price = prices[symbol]
+    price = prices.get(symbol)
+    if price is None:
+        raise ValueError(f"Market price is not available for {symbol}")
     shares = amount / price
-    position = portfolio.positions[symbol]
-    return run_invest(symbol, shares, amount, position.portfolio_class, movements_file, investments_file, sales_file, operation_id, account_id)
+    run_invest(symbol, shares, amount, position.portfolio_class, movements_file, investments_file, sales_file, operation_id, account_id)
 
 
-def run_sell(symbol, shares, amount, movements_file, investments_file=DEFAULT_INVESTMENTS_FILE, sales_file=DEFAULT_SALES_FILE, operation_id=None, account_id=DEFAULT_ACCOUNT_ID):
+def run_sell(symbol, shares, amount, movements_file, sales_file=DEFAULT_SALES_FILE, investments_file=DEFAULT_INVESTMENTS_FILE, operation_id=None, account_id=DEFAULT_ACCOUNT_ID):
     account_id = _validate_account_id(account_id)
-    from pfp.application.register_sale import register_sale
-    sale = register_sale(symbol, shares, amount, sales_file, operation_id=operation_id, account_id=account_id)
+    shares = Decimal(str(shares))
+    amount = Decimal(str(amount))
+    if shares <= 0:
+        raise ValueError("Shares must be greater than zero")
+    if amount <= 0:
+        raise ValueError("Amount must be greater than zero")
+    portfolio = load_portfolio(movements_file, investments_file, sales_file)
+    position = portfolio.positions.get(symbol)
+    if position is None:
+        raise ValueError("Symbol is not present in portfolio")
+    if shares > position.shares:
+        raise ValueError("Insufficient shares")
+    sale = Sale(datetime=datetime.now(timezone.utc), symbol=symbol, shares=shares, amount=amount, price=amount / shares, operation_id=operation_id, account_id=account_id)
+    SaleRepository(sales_file).save(sale)
+    portfolio = load_portfolio(movements_file, investments_file, sales_file)
+    position = portfolio.positions.get(symbol)
     print()
     print("========== VENTA REGISTRADA ==========")
     print()
-    print(f"Activo      : {sale.symbol}")
-    print(f"Participaciones: {sale.shares}")
-    print(f"Importe     : {sale.amount:.2f} €")
-    print(f"Precio      : {sale.price:.2f} €")
-    print(f"Cuenta      : {account_id}")
+    print(f"Activo          : {sale.symbol}")
+    print(f"Cuenta          : {sale.account_id}")
+    print(f"Participaciones : {sale.shares}")
+    print(f"Importe         : {sale.amount:.2f} €")
+    print(f"Precio          : {sale.price:.2f} €")
+    print(f"P/L realizado   : {portfolio.realized_gain_loss:.2f} €")
+    if position is not None:
+        print()
+        print(f"Posición total  : {position.shares} participaciones")
+        print(f"Coste restante  : {position.invested:.2f} €")
+        print(f"Efectivo        : {portfolio.cash:.2f} €")
     print()
-    return sale
 
 
 def main(argv=None):
-    parser = build_parser()
-    args = parser.parse_args(argv)
+    args = build_parser().parse_args(argv)
     if args.command == "import-tr":
         return run_import_tr(args.csv_file)
-    if args.command == "portfolio":
+    elif args.command == "portfolio":
         return run_portfolio(args.movements_file)
-    if args.command == "accounts":
+    elif args.command == "accounts":
         return run_accounts(args.movements_file, args.investments_file, args.sales_file)
-    if args.command == "reconcile":
+    elif args.command == "reconcile":
         return run_reconcile(args.movements_file, args.expected_balances_file, args.investments_file, args.sales_file, args.history_file)
-    if args.command == "snapshot":
+    elif args.command == "snapshot":
         return run_snapshot(args.movements_file, args.snapshots_file, args.investments_file, args.sales_file)
-    if args.command == "recommend":
+    elif args.command == "recommend":
         return run_recommend(args.amount, args.movements_file, args.investments_file, args.sales_file)
-    if args.command == "rebalance":
+    elif args.command == "rebalance":
         return run_rebalance(args.movements_file, args.investments_file, args.sales_file, execute=args.execute, account_id=args.account_id)
-    if args.command == "invest":
+    elif args.command == "invest":
         return run_invest(args.symbol, args.shares, args.amount, args.portfolio_class, args.movements_file, args.investments_file, args.sales_file, account_id=args.account_id)
-    if args.command == "invest-order":
+    elif args.command == "invest-order":
         return run_invest_order(args.symbol, args.amount, args.movements_file, args.investments_file, sales_file=args.sales_file, account_id=args.account_id)
-    if args.command == "sell":
-        return run_sell(args.symbol, args.shares, args.amount, args.movements_file, args.investments_file, args.sales_file, account_id=args.account_id)
+    elif args.command == "sell":
+        return run_sell(args.symbol, args.shares, args.amount, args.movements_file, args.sales_file, args.investments_file, account_id=args.account_id)
 
 
 if __name__ == "__main__":
