@@ -15,6 +15,7 @@ from pfp.web.investment_ui import investment_form_html
 from pfp.web.navigation import navigation_html
 from pfp.web.positions_ui import positions_html
 from pfp.web.reconciliation_history_ui import reconciliation_history_html
+from pfp.web.reconciliation_ui import reconciliation_html
 from pfp.web.sale_ui import sale_form_html
 
 
@@ -23,6 +24,8 @@ class WebApp:
     report: PortfolioReport
     assets: tuple = ()
     reconciliation_history: tuple = ()
+    accounts: tuple = ()
+    reconciliation_result: object = None
 
     def render(self, path: str) -> str:
         parsed = urlsplit(path)
@@ -30,7 +33,7 @@ class WebApp:
         query = parse_qs(parsed.query)
         sort = query.get("sort", ["weight"])[0]
         direction = query.get("direction", ["desc"])[0]
-        pages = {"/": self._dashboard, "/index.html": self._dashboard, "/accounts": self._accounts, "/positions": self._positions, "/movements": self._movements, "/allocation": self._allocation, "/reconciliation-history": self._reconciliation_history, "/investments/new": self._investment_form, "/sales/new": self._sale_form, "/assets": self._assets, "/assets/new": self._asset_form}
+        pages = {"/": self._dashboard, "/index.html": self._dashboard, "/accounts": self._accounts, "/positions": self._positions, "/movements": self._movements, "/allocation": self._allocation, "/reconciliation": self._reconciliation, "/reconciliation-history": self._reconciliation_history, "/investments/new": self._investment_form, "/sales/new": self._sale_form, "/assets": self._assets, "/assets/new": self._asset_form}
         renderer = pages.get(route)
         if renderer is None:
             raise KeyError(route)
@@ -48,6 +51,8 @@ class WebApp:
             content = self._sale_form()
         elif route == "/assets/new":
             content = self._asset_form()
+        elif route == "/reconciliation":
+            content = self._reconciliation(query.get("account_id", [None])[0])
         elif route == "/reconciliation-history":
             content = self._reconciliation_history(query.get("account_id", [None])[0])
         else:
@@ -74,6 +79,9 @@ class WebApp:
     def _allocation(self) -> str:
         return allocation_html(self.report)
 
+    def _reconciliation(self, account_id=None) -> str:
+        return reconciliation_html(self.accounts, account_id, result=self.reconciliation_result)
+
     def _reconciliation_history(self, account_id=None) -> str:
         return reconciliation_history_html(self.reconciliation_history, account_id)
 
@@ -97,6 +105,9 @@ class WebApp:
 
     def render_asset_form(self, error: str | None = None, values: dict[str, str] | None = None) -> str:
         return self._layout(self._asset_form(error, values), "/assets/new")
+
+    def render_reconciliation_form(self, error: str | None = None, values: dict[str, str] | None = None, account_id=None) -> str:
+        return self._layout(reconciliation_html(self.accounts, account_id, error=error, values=values, result=self.reconciliation_result), "/reconciliation")
 
 
 CSS = """

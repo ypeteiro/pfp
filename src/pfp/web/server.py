@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -16,6 +16,8 @@ from pfp.cli import DEFAULT_INVESTMENTS_FILE, DEFAULT_SALES_FILE, load_portfolio
 from pfp.domain.asset import Asset
 from pfp.domain.asset_catalog import AssetCatalog
 from pfp.domain.portfolio import Portfolio
+from pfp.domain.account_reconciliation_record import AccountReconciliationRecord
+from pfp.engine.account_reconciliation_engine import AccountReconciliationEngine
 from pfp.importers.account_reconciliation_repository import AccountReconciliationRepository
 from pfp.importers.asset_repository import AssetRepository
 from pfp.importers.investment_repository import InvestmentRepository
@@ -147,13 +149,23 @@ def parse_asset_request(form: dict[str, list[str]]) -> Asset:
     )
 
 
+def parse_reconciliation_request(form: dict[str, list[str]]):
+    try:
+        expected_balance = Decimal(_required(form, "expected_balance"))
+    except InvalidOperation as exc:
+        raise ValueError("El saldo esperado no es válido") from exc
+    if expected_balance < 0:
+        raise ValueError("El saldo esperado no puede ser negativo")
+    return _required(form, "account_id"), expected_balance
+
+
 def serve(movements_file: Path, host: str = "127.0.0.1", port: int = 8000, investments_file: Path | None = None, sales_file: Path | None = None, assets_file: Path | None = None, price_provider=None, reconciliations_file: Path | None = None) -> None:
     def make_runtime() -> WebRuntime:
         return build_web_runtime(movements_file, investments_file, sales_file, price_provider, assets_file)
 
     runtime = make_runtime()
     reconciliation_repository = AccountReconciliationRepository(reconciliations_file or DEFAULT_RECONCILIATIONS_FILE)
-    app = WebApp(runtime.report(), AssetCatalog.all(), tuple(reconciliation_repository.load()))
+    app = WebApp(runtime.report(), AssetCatalog.all(), tuple(reconciliation_repository.load()), tuple(runtime.portfolio.accounts))
 
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
@@ -163,7 +175,7 @@ def serve(movements_file: Path, host: str = "127.0.0.1", port: int = 8000, inves
                 try:
                     runtime = make_runtime()
                     reconciliation_repository = AccountReconciliationRepository(reconciliations_file or DEFAULT_RECONCILIATIONS_FILE)
-                    app = WebApp(runtime.report(), AssetCatalog.all(), tuple(reconciliation_repository.load()))
+                    app = WebApp(runtime.report(), AssetCatalog.all(), tuple(reconciliation_repository.load()), tuple(runtime.portfolio.accounts))
                 except Exception as exc:
                     self.send_error(500, f"No se han podido actualizar los datos: {exc}")
                     return
@@ -194,12 +206,11 @@ def serve(movements_file: Path, host: str = "127.0.0.1", port: int = 8000, inves
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
-            self.wfile.write(body
-)
+            self.wfile.write(body)
 
         def do_POST(self):
             nonlocal app
-            if self.path not in {"/investments", "/sales", "/assets"}:
+            if self.path not in {"/investments", "/sales", "/assets", "/reconcile"}:
                 self.send_error(404)
                 return
             form = {}
@@ -213,10 +224,33 @@ def serve(movements_file: Path, host: str = "127.0.0.1", port: int = 8000, inves
                 elif self.path == "/sales":
                     request = parse_sale_request(form)
                     runtime.register_sale(request)
-                else:
+                elif self.path == "/assets":
                     asset = parse_asset_request(form)
                     runtime.register_asset(asset)
-                app = WebApp(runtime.report(), AssetCatalog.all(), tuple(reconciliation_repository.load()))
+                else:
+                    account_id, expected_balance = parse_reconciliation_request(form)
+                    account = next((item for item in runtime.portfolio.accounts if item.id == account_id), None)
+                    if account is None:
+                        raise ValueError(f"Cuenta desconocida: {account_id}")
+                    reconciliation = AccountReconciliationEngine.reconcile(account, expected_balance)
+                    record = AccountReconciliationRecord(
+                        datetime=datetime.now(timezone.utc),
+                        account_id=reconciliation.account_id,
+                        expected_balance=reconciliation.expected_balance,
+                        calculated_balance=reconciliation.calculated_balance,
+                        difference=reconciliation.difference,
+                        status="RECONCILED" if reconciliation.is_reconciled else "MISMATCH",
+                    )
+                    reconciliation_repository.save(record)
+                    app = WebApp(runtime.report(), AssetCatalog.all(), tuple(reconciliation_repository.load()), tuple(runtime.portfolio.accounts), reconciliation)
+                    body = app.render_reconciliation_form(account_id=account_id).encode("utf-8")
+                    self.send_response(200)
+                    self.send_header("Content-Type", "text/html; charset=utf-8")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+                    return
+                app = WebApp(runtime.report(), AssetCatalog.all(), tuple(reconciliation_repository.load()), tuple(runtime.portfolio.accounts))
                 redirect = "/positions" if self.path != "/assets" else "/assets"
             except (ValueError, InvalidOperation) as exc:
                 values = {key: values[0] if values else "" for key, values in form.items()}
@@ -224,6 +258,8 @@ def serve(movements_file: Path, host: str = "127.0.0.1", port: int = 8000, inves
                     body = app.render_investment_form(str(exc), values).encode("utf-8")
                 elif self.path == "/sales":
                     body = app.render_sale_form(str(exc), values).encode("utf-8")
+                elif self.path == "/reconcile":
+                    body = app.render_reconciliation_form(str(exc), values, values.get("account_id")).encode("utf-8")
                 else:
                     body = app.render_asset_form(str(exc), values).encode("utf-8")
                 self.send_response(400)
