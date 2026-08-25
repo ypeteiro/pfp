@@ -4,9 +4,9 @@ from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 
+from pfp.domain.account import Account
 from pfp.domain.external_cash_movement import ExternalCashMovement
 from pfp.domain.portfolio import Portfolio
-from pfp.engine.portfolio_engine import PortfolioEngine
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,5 +43,24 @@ class RegisterExternalCashMovement:
             currency=request.currency,
             description=request.description,
         )
-        PortfolioEngine().apply_external_cash_movement(portfolio, movement)
+
+        account = next(
+            (account for account in portfolio.accounts if account.account_id == movement.account_id),
+            None,
+        )
+        if account is None:
+            account = Account(
+                name=movement.account_id,
+                broker=movement.account_id,
+                currency=movement.currency,
+                account_id=movement.account_id,
+                balance=Decimal("0"),
+            )
+            portfolio.accounts.append(account)
+            portfolio.account_positions.setdefault(movement.account_id, {})
+        elif account.currency != movement.currency:
+            raise ValueError("External cash movement currency does not match account currency")
+
+        account.balance += movement.amount
+        portfolio.cash += movement.amount
         return movement
