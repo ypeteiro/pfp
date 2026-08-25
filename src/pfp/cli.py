@@ -3,7 +3,6 @@ import hashlib
 from dataclasses import replace
 from datetime import datetime, timezone
 from decimal import Decimal
-from pathlib import Path
 
 from pfp.cli_output import print_portfolio
 from pfp.domain.account_catalog import DEFAULT_ACCOUNT_CATALOG
@@ -51,6 +50,9 @@ def build_parser():
     reconcile_parser.add_argument("--investments-file", default=DEFAULT_INVESTMENTS_FILE)
     reconcile_parser.add_argument("--sales-file", default=DEFAULT_SALES_FILE)
     reconcile_parser.add_argument("--history-file", default=DEFAULT_RECONCILIATIONS_FILE)
+    history_parser = subparsers.add_parser("reconcile-history", help="Show account reconciliation history")
+    history_parser.add_argument("account_id")
+    history_parser.add_argument("--history-file", default=DEFAULT_RECONCILIATIONS_FILE)
     accounts_parser.add_argument("movements_file")
     accounts_parser.add_argument("--investments-file", default=DEFAULT_INVESTMENTS_FILE)
     accounts_parser.add_argument("--sales-file", default=DEFAULT_SALES_FILE)
@@ -135,16 +137,7 @@ def run_reconcile(movements_file, expected_balances_file, investments_file=DEFAU
     timestamp = datetime.now(timezone.utc)
     history_repository = AccountReconciliationRepository(history_file)
     for item in reconciliations:
-        history_repository.save(
-            AccountReconciliationRecord(
-                datetime=timestamp,
-                account_id=item.account_id,
-                expected_balance=item.expected_balance,
-                calculated_balance=item.calculated_balance,
-                difference=item.difference,
-                status="RECONCILED" if item.is_reconciled else "MISMATCH",
-            )
-        )
+        history_repository.save(AccountReconciliationRecord(datetime=timestamp, account_id=item.account_id, expected_balance=item.expected_balance, calculated_balance=item.calculated_balance, difference=item.difference, status="RECONCILED" if item.is_reconciled else "MISMATCH"))
     print()
     print("========== CONCILIACIÓN ==========")
     print()
@@ -153,6 +146,23 @@ def run_reconcile(movements_file, expected_balances_file, investments_file=DEFAU
         print(f"{item.account_id:<24} esperado {item.expected_balance:>12.2f} €  calculado {item.calculated_balance:>12.2f} €  diferencia {item.difference:>10.2f} €  {status}")
     print()
     return reconciliations
+
+
+def run_reconcile_history(account_id, history_file=DEFAULT_RECONCILIATIONS_FILE):
+    account_id = _validate_account_id(account_id)
+    history = AccountReconciliationRepository(history_file).history(account_id)
+    print()
+    print("========== HISTORIAL DE CONCILIACIÓN ==========")
+    print()
+    print(f"Cuenta: {account_id}")
+    print()
+    if not history:
+        print(f"No hay registros de conciliación para {account_id}.")
+        print()
+        return
+    for record in history:
+        print(f"{record.datetime:%Y-%m-%d %H:%M:%S UTC}  esperado {record.expected_balance:>12.2f} €  calculado {record.calculated_balance:>12.2f} €  diferencia {record.difference:>10.2f} €  {record.status}")
+    print()
 
 
 def run_accounts(movements_file, investments_file=DEFAULT_INVESTMENTS_FILE, sales_file=DEFAULT_SALES_FILE):
@@ -189,19 +199,7 @@ def run_snapshot(movements_file, snapshots_file=DEFAULT_SNAPSHOTS_FILE, investme
         portfolio_class = position.portfolio_class or "CRYPTO"
         if portfolio_class in class_values:
             class_values[portfolio_class] += position.market_value or Decimal("0")
-    snapshot = PortfolioSnapshot(
-        datetime=datetime.now(timezone.utc),
-        total_value=portfolio.cash + market_value,
-        cash=portfolio.cash,
-        invested_cost=portfolio.invested,
-        market_value=market_value,
-        realized_gain_loss=portfolio.realized_gain_loss,
-        unrealized_gain_loss=unrealized,
-        equity_value=class_values["EQUITY"],
-        fixed_income_value=class_values["FIXED_INCOME"],
-        gold_value=class_values["GOLD"],
-        crypto_value=class_values["CRYPTO"],
-    )
+    snapshot = PortfolioSnapshot(datetime=datetime.now(timezone.utc), total_value=portfolio.cash + market_value, cash=portfolio.cash, invested_cost=portfolio.invested, market_value=market_value, realized_gain_loss=portfolio.realized_gain_loss, unrealized_gain_loss=unrealized, equity_value=class_values["EQUITY"], fixed_income_value=class_values["FIXED_INCOME"], gold_value=class_values["GOLD"], crypto_value=class_values["CRYPTO"])
     SnapshotRepository(snapshots_file).save(snapshot)
     print()
     print("========== SNAPSHOT ==========")
@@ -398,6 +396,8 @@ def main(argv=None):
         return run_accounts(args.movements_file, args.investments_file, args.sales_file)
     elif args.command == "reconcile":
         return run_reconcile(args.movements_file, args.expected_balances_file, args.investments_file, args.sales_file, args.history_file)
+    elif args.command == "reconcile-history":
+        return run_reconcile_history(args.account_id, args.history_file)
     elif args.command == "snapshot":
         return run_snapshot(args.movements_file, args.snapshots_file, args.investments_file, args.sales_file)
     elif args.command == "recommend":
