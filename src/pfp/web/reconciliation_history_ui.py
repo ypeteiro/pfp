@@ -28,11 +28,14 @@ def reconciliation_history_html(records=(), account_id=None):
 
     return f'''<h1>Historial de conciliación</h1>
 <div class="panel">
-  <form class="history-filter" method="get" action="/reconciliation-history">
-    <label for="account_id">Cuenta</label>
-    <select id="account_id" name="account_id" onchange="this.form.submit()">{options}</select>
-    <noscript><button type="submit">Mostrar</button></noscript>
-  </form>
+  <div class="panel-heading">
+    <form class="history-filter" method="get" action="/reconciliation-history">
+      <label for="account_id">Cuenta</label>
+      <select id="account_id" name="account_id" onchange="this.form.submit()">{options}</select>
+      <noscript><button type="submit">Mostrar</button></noscript>
+    </form>
+    <a class="new-investment-link" href="/reconciliation">Nueva conciliación</a>
+  </div>
 </div>
 <div class="panel" style="margin-top:18px">
   <div class="panel-heading"><h2>{escape(selected) if selected else 'Historial'}</h2><span>{len(history)} registro(s)</span></div>
