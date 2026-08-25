@@ -3,6 +3,7 @@ import hashlib
 from dataclasses import replace
 from datetime import datetime, timezone
 from decimal import Decimal
+from pathlib import Path
 
 from pfp.cli_output import print_portfolio
 from pfp.domain.account_catalog import DEFAULT_ACCOUNT_CATALOG
@@ -149,7 +150,6 @@ def run_reconcile(movements_file, expected_balances_file, investments_file=DEFAU
 
 
 def run_reconcile_history(account_id, history_file=DEFAULT_RECONCILIATIONS_FILE):
-    account_id = _validate_account_id(account_id)
     history = AccountReconciliationRepository(history_file).history(account_id)
     print()
     print("========== HISTORIAL DE CONCILIACIÓN ==========")
