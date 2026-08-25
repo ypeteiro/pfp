@@ -7,6 +7,7 @@ from pathlib import Path
 
 from pfp.cli_output import print_portfolio
 from pfp.domain.account_catalog import DEFAULT_ACCOUNT_CATALOG
+from pfp.domain.account_reconciliation_record import AccountReconciliationRecord
 from pfp.domain.sale import Sale
 from pfp.domain.snapshot import PortfolioSnapshot
 from pfp.engine.investment_engine import InvestmentEngine
@@ -14,6 +15,7 @@ from pfp.engine.portfolio_engine import PortfolioEngine
 from pfp.engine.rebalance_engine import RebalanceEngine
 from pfp.engine.recommendation_engine import RecommendationEngine
 from pfp.importers.account_opening_balance_repository import AccountOpeningBalanceRepository
+from pfp.importers.account_reconciliation_repository import AccountReconciliationRepository
 from pfp.importers.account_transfer_repository import AccountTransferRepository
 from pfp.importers.investment_repository import InvestmentRepository
 from pfp.importers.sale_repository import SaleRepository
@@ -24,6 +26,7 @@ from pfp.market.price_provider import CompositePriceProvider
 DEFAULT_INVESTMENTS_FILE = "data/imports/investments.csv"
 DEFAULT_SALES_FILE = "data/imports/sales.csv"
 DEFAULT_SNAPSHOTS_FILE = "data/imports/snapshots.csv"
+DEFAULT_RECONCILIATIONS_FILE = "data/accounts/reconciliation_history.csv"
 DEFAULT_OPENING_BALANCES_FILE = "data/accounts/abanca_ahorro_opening_balance.csv"
 DEFAULT_ACCOUNT_TRANSFERS_FILE = "data/accounts/account_transfers.csv"
 DEFAULT_ACCOUNT_ID = "Trade Republic"
@@ -47,6 +50,10 @@ def build_parser():
     reconcile_parser.add_argument("expected_balances_file", help="CSV with account_id and expected_balance columns")
     reconcile_parser.add_argument("--investments-file", default=DEFAULT_INVESTMENTS_FILE)
     reconcile_parser.add_argument("--sales-file", default=DEFAULT_SALES_FILE)
+    reconcile_parser.add_argument("--history-file", default=DEFAULT_RECONCILIATIONS_FILE)
+    history_parser = subparsers.add_parser("reconcile-history", help="Show account reconciliation history")
+    history_parser.add_argument("account_id")
+    history_parser.add_argument("--history-file", default=DEFAULT_RECONCILIATIONS_FILE)
     accounts_parser.add_argument("movements_file")
     accounts_parser.add_argument("--investments-file", default=DEFAULT_INVESTMENTS_FILE)
     accounts_parser.add_argument("--sales-file", default=DEFAULT_SALES_FILE)
@@ -121,13 +128,17 @@ def run_portfolio(movements_file):
     print_portfolio(portfolio)
 
 
-def run_reconcile(movements_file, expected_balances_file, investments_file=DEFAULT_INVESTMENTS_FILE, sales_file=DEFAULT_SALES_FILE):
+def run_reconcile(movements_file, expected_balances_file, investments_file=DEFAULT_INVESTMENTS_FILE, sales_file=DEFAULT_SALES_FILE, history_file=DEFAULT_RECONCILIATIONS_FILE):
     import csv
     from pfp.engine.account_reconciliation_engine import AccountReconciliationEngine
     portfolio = load_portfolio(movements_file, investments_file, sales_file)
     with open(expected_balances_file, encoding="utf-8", newline="") as handle:
         expected = {row["account_id"]: Decimal(row["expected_balance"]) for row in csv.DictReader(handle)}
     reconciliations = AccountReconciliationEngine.reconcile_portfolio(portfolio, expected)
+    timestamp = datetime.now(timezone.utc)
+    history_repository = AccountReconciliationRepository(history_file)
+    for item in reconciliations:
+        history_repository.save(AccountReconciliationRecord(datetime=timestamp, account_id=item.account_id, expected_balance=item.expected_balance, calculated_balance=item.calculated_balance, difference=item.difference, status="RECONCILED" if item.is_reconciled else "MISMATCH"))
     print()
     print("========== CONCILIACIÓN ==========")
     print()
@@ -136,6 +147,22 @@ def run_reconcile(movements_file, expected_balances_file, investments_file=DEFAU
         print(f"{item.account_id:<24} esperado {item.expected_balance:>12.2f} €  calculado {item.calculated_balance:>12.2f} €  diferencia {item.difference:>10.2f} €  {status}")
     print()
     return reconciliations
+
+
+def run_reconcile_history(account_id, history_file=DEFAULT_RECONCILIATIONS_FILE):
+    history = AccountReconciliationRepository(history_file).history(account_id)
+    print()
+    print("========== HISTORIAL DE CONCILIACIÓN ==========")
+    print()
+    print(f"Cuenta: {account_id}")
+    print()
+    if not history:
+        print(f"No hay registros de conciliación para {account_id}.")
+        print()
+        return
+    for record in history:
+        print(f"{record.datetime:%Y-%m-%d %H:%M:%S UTC}  esperado {record.expected_balance:>12.2f} €  calculado {record.calculated_balance:>12.2f} €  diferencia {record.difference:>10.2f} €  {record.status}")
+    print()
 
 
 def run_accounts(movements_file, investments_file=DEFAULT_INVESTMENTS_FILE, sales_file=DEFAULT_SALES_FILE):
@@ -172,19 +199,7 @@ def run_snapshot(movements_file, snapshots_file=DEFAULT_SNAPSHOTS_FILE, investme
         portfolio_class = position.portfolio_class or "CRYPTO"
         if portfolio_class in class_values:
             class_values[portfolio_class] += position.market_value or Decimal("0")
-    snapshot = PortfolioSnapshot(
-        datetime=datetime.now(timezone.utc),
-        total_value=portfolio.cash + market_value,
-        cash=portfolio.cash,
-        invested_cost=portfolio.invested,
-        market_value=market_value,
-        realized_gain_loss=portfolio.realized_gain_loss,
-        unrealized_gain_loss=unrealized,
-        equity_value=class_values["EQUITY"],
-        fixed_income_value=class_values["FIXED_INCOME"],
-        gold_value=class_values["GOLD"],
-        crypto_value=class_values["CRYPTO"],
-    )
+    snapshot = PortfolioSnapshot(datetime=datetime.now(timezone.utc), total_value=portfolio.cash + market_value, cash=portfolio.cash, invested_cost=portfolio.invested, market_value=market_value, realized_gain_loss=portfolio.realized_gain_loss, unrealized_gain_loss=unrealized, equity_value=class_values["EQUITY"], fixed_income_value=class_values["FIXED_INCOME"], gold_value=class_values["GOLD"], crypto_value=class_values["CRYPTO"])
     SnapshotRepository(snapshots_file).save(snapshot)
     print()
     print("========== SNAPSHOT ==========")
@@ -371,25 +386,31 @@ def run_sell(symbol, shares, amount, movements_file, sales_file=DEFAULT_SALES_FI
     print()
 
 
-def main():
-    args = build_parser().parse_args()
+def main(argv=None):
+    args = build_parser().parse_args(argv)
     if args.command == "import-tr":
-        run_import_tr(args.csv_file)
+        return run_import_tr(args.csv_file)
     elif args.command == "portfolio":
-        run_portfolio(args.movements_file)
+        return run_portfolio(args.movements_file)
     elif args.command == "accounts":
-        run_accounts(args.movements_file, args.investments_file, args.sales_file)
+        return run_accounts(args.movements_file, args.investments_file, args.sales_file)
     elif args.command == "reconcile":
-        run_reconcile(args.movements_file, args.expected_balances_file, args.investments_file, args.sales_file)
+        return run_reconcile(args.movements_file, args.expected_balances_file, args.investments_file, args.sales_file, args.history_file)
+    elif args.command == "reconcile-history":
+        return run_reconcile_history(args.account_id, args.history_file)
     elif args.command == "snapshot":
-        run_snapshot(args.movements_file, args.snapshots_file, args.investments_file, args.sales_file)
+        return run_snapshot(args.movements_file, args.snapshots_file, args.investments_file, args.sales_file)
     elif args.command == "recommend":
-        run_recommend(args.amount, args.movements_file, args.investments_file, args.sales_file)
+        return run_recommend(args.amount, args.movements_file, args.investments_file, args.sales_file)
     elif args.command == "rebalance":
-        run_rebalance(args.movements_file, args.investments_file, args.sales_file, execute=args.execute, account_id=args.account_id)
+        return run_rebalance(args.movements_file, args.investments_file, args.sales_file, execute=args.execute, account_id=args.account_id)
     elif args.command == "invest":
-        run_invest(args.symbol, args.shares, args.amount, args.portfolio_class, args.movements_file, args.investments_file, args.sales_file, account_id=args.account_id)
+        return run_invest(args.symbol, args.shares, args.amount, args.portfolio_class, args.movements_file, args.investments_file, args.sales_file, account_id=args.account_id)
     elif args.command == "invest-order":
-        run_invest_order(args.symbol, args.amount, args.movements_file, args.investments_file, sales_file=args.sales_file, account_id=args.account_id)
+        return run_invest_order(args.symbol, args.amount, args.movements_file, args.investments_file, sales_file=args.sales_file, account_id=args.account_id)
     elif args.command == "sell":
-        run_sell(args.symbol, args.shares, args.amount, args.movements_file, args.sales_file, args.investments_file, account_id=args.account_id)
+        return run_sell(args.symbol, args.shares, args.amount, args.movements_file, args.sales_file, args.investments_file, account_id=args.account_id)
+
+
+if __name__ == "__main__":
+    main()
