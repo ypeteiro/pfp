@@ -16,6 +16,7 @@ from pfp.cli import DEFAULT_INVESTMENTS_FILE, DEFAULT_SALES_FILE, load_portfolio
 from pfp.domain.asset import Asset
 from pfp.domain.asset_catalog import AssetCatalog
 from pfp.domain.portfolio import Portfolio
+from pfp.importers.account_reconciliation_repository import AccountReconciliationRepository
 from pfp.importers.asset_repository import AssetRepository
 from pfp.importers.investment_repository import InvestmentRepository
 from pfp.importers.sale_repository import SaleRepository
@@ -25,6 +26,7 @@ from pfp.web.app import WebApp
 from pfp.web.rebalance_ui import rebalance_html
 
 DEFAULT_ASSETS_FILE = Path("data/assets.csv")
+DEFAULT_RECONCILIATIONS_FILE = Path("data/accounts/reconciliation_history.csv")
 
 
 def dashboard_html(report: PortfolioReport) -> str:
@@ -145,21 +147,23 @@ def parse_asset_request(form: dict[str, list[str]]) -> Asset:
     )
 
 
-def serve(movements_file: Path, host: str = "127.0.0.1", port: int = 8000, investments_file: Path | None = None, sales_file: Path | None = None, assets_file: Path | None = None, price_provider=None) -> None:
+def serve(movements_file: Path, host: str = "127.0.0.1", port: int = 8000, investments_file: Path | None = None, sales_file: Path | None = None, assets_file: Path | None = None, price_provider=None, reconciliations_file: Path | None = None) -> None:
     def make_runtime() -> WebRuntime:
         return build_web_runtime(movements_file, investments_file, sales_file, price_provider, assets_file)
 
     runtime = make_runtime()
-    app = WebApp(runtime.report(), AssetCatalog.all())
+    reconciliation_repository = AccountReconciliationRepository(reconciliations_file or DEFAULT_RECONCILIATIONS_FILE)
+    app = WebApp(runtime.report(), AssetCatalog.all(), tuple(reconciliation_repository.load()))
 
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
-            nonlocal app, runtime
+            nonlocal app, runtime, reconciliation_repository
             path = self.path
             if path == "/refresh":
                 try:
                     runtime = make_runtime()
-                    app = WebApp(runtime.report(), AssetCatalog.all())
+                    reconciliation_repository = AccountReconciliationRepository(reconciliations_file or DEFAULT_RECONCILIATIONS_FILE)
+                    app = WebApp(runtime.report(), AssetCatalog.all(), tuple(reconciliation_repository.load()))
                 except Exception as exc:
                     self.send_error(500, f"No se han podido actualizar los datos: {exc}")
                     return
@@ -190,7 +194,8 @@ def serve(movements_file: Path, host: str = "127.0.0.1", port: int = 8000, inves
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
-            self.wfile.write(body)
+            self.wfile.write(body
+)
 
         def do_POST(self):
             nonlocal app
@@ -211,7 +216,7 @@ def serve(movements_file: Path, host: str = "127.0.0.1", port: int = 8000, inves
                 else:
                     asset = parse_asset_request(form)
                     runtime.register_asset(asset)
-                app = WebApp(runtime.report(), AssetCatalog.all())
+                app = WebApp(runtime.report(), AssetCatalog.all(), tuple(reconciliation_repository.load()))
                 redirect = "/positions" if self.path != "/assets" else "/assets"
             except (ValueError, InvalidOperation) as exc:
                 values = {key: values[0] if values else "" for key, values in form.items()}
@@ -250,10 +255,11 @@ def main() -> None:
     parser.add_argument("--investments-file", default=DEFAULT_INVESTMENTS_FILE)
     parser.add_argument("--sales-file", default=DEFAULT_SALES_FILE)
     parser.add_argument("--assets-file", default=str(DEFAULT_ASSETS_FILE))
+    parser.add_argument("--reconciliations-file", default=str(DEFAULT_RECONCILIATIONS_FILE))
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)
     args = parser.parse_args()
-    serve(Path(args.movements_file), args.host, args.port, Path(args.investments_file), Path(args.sales_file), Path(args.assets_file))
+    serve(Path(args.movements_file), args.host, args.port, Path(args.investments_file), Path(args.sales_file), Path(args.assets_file), reconciliations_file=Path(args.reconciliations_file))
 
 
 if __name__ == "__main__":
