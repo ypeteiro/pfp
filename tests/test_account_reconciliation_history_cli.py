@@ -23,8 +23,8 @@ def test_run_reconcile_persists_history_record(tmp_path):
     assert len(records) == 1
     assert records[0].account_id == "Trade Republic"
     assert records[0].expected_balance == Decimal("3040.29")
-    assert records[0].calculated_balance == Decimal("3240.29")
-    assert records[0].difference == Decimal("200")
+    assert records[0].calculated_balance == Decimal("2840.29")
+    assert records[0].difference == Decimal("-200")
     assert records[0].status == "MISMATCH"
     assert records[0].datetime.tzinfo is not None
     assert records[0].datetime.utcoffset() is not None
@@ -34,7 +34,7 @@ def test_run_reconcile_appends_history_for_each_execution(tmp_path):
     expected_file = tmp_path / "expected.csv"
     history_file = tmp_path / "reconciliations.csv"
     expected_file.write_text(
-        "account_id,expected_balance\nTrade Republic,3240.29\n",
+        "account_id,expected_balance\nTrade Republic,2840.29\n",
         encoding="utf-8",
     )
 
