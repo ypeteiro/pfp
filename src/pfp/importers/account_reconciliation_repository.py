@@ -37,6 +37,12 @@ class AccountReconciliationRepository:
                 for row in reader
             ]
 
+    def history(self, account_id):
+        return sorted(
+            (record for record in self.load() if record.account_id == account_id),
+            key=lambda record: record.datetime,
+        )
+
     def save(self, record):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         file_exists = self.path.exists()
