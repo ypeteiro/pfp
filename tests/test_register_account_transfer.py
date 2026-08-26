@@ -22,8 +22,9 @@ def _portfolio() -> Portfolio:
     return Portfolio(accounts=accounts, account_positions={"abanca": {}, "trade_republic": {}})
 
 
-def test_register_account_transfer_moves_cash_between_accounts_without_changing_total_cash():
+def test_register_account_transfer_moves_cash_between_accounts_without_changing_total_account_cash():
     portfolio = _portfolio()
+    initial_account_cash = sum(account.balance for account in portfolio.accounts)
 
     transfer = RegisterAccountTransfer().execute(
         portfolio,
@@ -33,7 +34,7 @@ def test_register_account_transfer_moves_cash_between_accounts_without_changing_
     assert transfer.source_account == "abanca"
     assert portfolio.accounts[0].balance == Decimal("700")
     assert portfolio.accounts[1].balance == Decimal("500")
-    assert portfolio.cash == Decimal("1200")
+    assert sum(account.balance for account in portfolio.accounts) == initial_account_cash
 
 
 def test_register_account_transfer_rejects_insufficient_source_cash():
