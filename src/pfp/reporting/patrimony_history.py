@@ -55,6 +55,13 @@ class PatrimonyHistory:
                     cash += movement.amount
                     contributed += movement.amount
 
+            for transfer in account_transfers:
+                if transfer.datetime <= date:
+                    # Internal transfers redistribute existing cash and therefore
+                    # must not affect consolidated cash or cumulative contributions.
+                    # The consolidated history only needs to preserve total cash.
+                    pass
+
             for investment in investments:
                 if investment.datetime <= date:
                     cash -= investment.amount
@@ -66,8 +73,6 @@ class PatrimonyHistory:
                     cash += sale.amount
                     holdings[sale.symbol] = holdings.get(sale.symbol, Decimal("0")) - sale.shares
                     invested_cost -= sale.amount
-
-            _ = account_transfers
 
             market_value = Decimal("0")
             for symbol, shares in holdings.items():
