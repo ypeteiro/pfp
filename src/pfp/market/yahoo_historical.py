@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 
 import yfinance as yf
@@ -22,7 +22,7 @@ class YahooFinanceHistoricalPriceProvider(HistoricalPriceProvider):
         try:
             history = yf.Ticker(yahoo_symbol).history(
                 start=at.date(),
-                end=at.date(),
+                end=at.date() + timedelta(days=1),
                 auto_adjust=False,
             )
             if history.empty:
