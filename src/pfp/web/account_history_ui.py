@@ -18,9 +18,9 @@ def _money(value: Decimal) -> str:
 
 
 def account_history_html(accounts, external_cash_movements=None, account_transfers=None) -> str:
-    if external_cash_movements is None:
+    if external_cash_movements is None or not external_cash_movements:
         external_cash_movements = ExternalCashMovementRepository(DEFAULT_EXTERNAL_CASH_MOVEMENTS_FILE).load()
-    if account_transfers is None:
+    if account_transfers is None or not account_transfers:
         account_transfers = AccountTransferRepository(DEFAULT_ACCOUNT_TRANSFERS_FILE).load()
 
     account_names = {account.id: account.name for account in accounts}
