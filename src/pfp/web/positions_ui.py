@@ -26,8 +26,10 @@ def positions_html(report: PortfolioReport, sort: str = "weight", direction: str
         price = euro(p.market_price)
         if p.market_price is not None:
             price += price_tooltip(p.symbol, report.price_consulted_at)
+        isin = escape(p.isin or "")
+        isin_link = f'<a href="https://www.justetf.com/en/etf-profile.html?isin={escape(p.isin)}" target="_blank" rel="noopener noreferrer">{isin}</a>' if p.isin else ""
         rows.append(
-            f'<tr><td><strong>{escape(p.ticker or p.symbol or p.isin)}</strong><small>{escape(p.isin or "")}</small></td>'
+            f'<tr><td><strong>{escape(p.ticker or p.symbol or p.isin)}</strong><small>{isin_link}</small></td>'
             f'<td>{escape(p.name)}</td><td>{escape(p.portfolio_class or "—")}</td><td>{p.shares}</td>'
             f'<td>{euro(p.invested)}</td><td>{price}</td><td>{euro(value)}</td>'
             f'<td>{pct(weight)}</td><td class="{tone}">{euro(gain)}<small>{pct(gain_pct)}</small></td></tr>'
