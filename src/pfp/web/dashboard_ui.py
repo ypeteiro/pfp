@@ -4,9 +4,8 @@ from datetime import datetime
 from decimal import Decimal
 from html import escape
 
-from pfp.domain.capital_flow import CapitalFlow, FlowType
 from pfp.excel.allocation_actions import build_allocation_rows
-from pfp.reporting.patrimony_evolution import PatrimonyEvolution
+from pfp.reporting.patrimony_series import PatrimonyPoint
 from pfp.reporting.portfolio_report import PortfolioReport
 
 ALLOCATION_LABELS = {"RV": "Renta variable", "RF": "Renta fija", "Oro": "Oro", "Cripto": "Criptoactivos"}
@@ -45,7 +44,7 @@ def dashboard_v2_html(report: PortfolioReport, sort: str = "weight", direction: 
         for p in positions[:10]
     )
     total_pl = report.realized_gain_loss + report.unrealized_gain_loss
-    evolution_html = _evolution_summary(_evolution_from_report(report))
+    evolution_html = _evolution_summary(report.patrimony_series)
     consulted_at = report.price_consulted_at or datetime.now().astimezone()
     consulted = consulted_at.strftime("%d/%m/%Y %H:%M")
     price_status = f'<p class="price-status">Precios de mercado consultados: {consulted}</p>'
@@ -76,21 +75,38 @@ def sort_heading(label: str, field: str, current: str, direction: str) -> str:
     return f'<th><a class="sortable-heading" href="/?sort={field}&direction={next_direction}">{label}<span class="sort-arrow">{arrow}</span></a></th>'
 
 
-def _evolution_from_report(report: PortfolioReport) -> PatrimonyEvolution:
-    flows = []
-    for movement in report.movements:
-        movement_type = movement.type.upper().strip()
-        if movement_type in {FlowType.CONTRIBUTION.value, FlowType.WITHDRAWAL.value}:
-            flows.append(CapitalFlow(movement.datetime, abs(movement.amount), FlowType(movement_type), movement.transaction_id))
-    return PatrimonyEvolution.from_capital_flows(flows)
+def _evolution_summary(points: tuple[PatrimonyPoint, ...]) -> str:
+    if not points:
+        return '<section class="panel patrimony-evolution"><div class="panel-heading"><h2>Evolución patrimonial</h2></div><p class="muted">Todavía no hay suficientes datos históricos para mostrar la evolución.</p></section>'
 
+    width, height, padding = 720, 220, 34
+    values = [value for point in points for value in (point.patrimony, point.cumulative_contributed)]
+    if not values:
+        return '<section class="panel patrimony-evolution"><div class="panel-heading"><h2>Evolución patrimonial</h2></div><p class="muted">Sin datos históricos.</p></section>'
+    minimum = min(Decimal("0"), min(values))
+    maximum = max(Decimal("1"), max(values))
+    span = maximum - minimum or Decimal("1")
 
-def _evolution_summary(evolution: PatrimonyEvolution) -> str:
-    if not evolution.points:
-        return '<section class="panel patrimony-evolution"><div class="panel-heading"><h2>Evolución patrimonial</h2>{}</div><p class="muted">Sin aportaciones o retiradas históricas clasificadas todavía.</p></section>'.format(tooltip("Muestra cómo evoluciona el capital neto aportado a lo largo del tiempo."))
-    last = evolution.points[-1]
-    tone = "positive" if last.net_flow >= 0 else "negative"
-    return f'<section class="panel patrimony-evolution"><div class="panel-heading"><h2>Evolución patrimonial {tooltip("Muestra la evolución de los movimientos de capital registrados.")}</h2><span>{len(evolution.points)} movimientos de capital</span></div><div class="evolution-summary"><div><span>Capital neto aportado</span><strong>{euro(last.cumulative_contributed)}</strong></div><div><span>Aportaciones</span><strong>{euro(evolution.total_contributions)}</strong></div><div><span>Retiradas</span><strong>{euro(evolution.total_withdrawals)}</strong></div><div><span>Último flujo</span><strong class="{tone}">{euro(last.net_flow)}</strong></div></div></section>'
+    def coordinates(values_for_line):
+        if len(points) == 1:
+            xs = [width / 2]
+        else:
+            xs = [padding + index * (width - 2 * padding) / (len(points) - 1) for index in range(len(points))]
+        ys = [height - padding - float((value - minimum) / span) * (height - 2 * padding) for value in values_for_line]
+        return " ".join(f"{x:.1f},{y:.1f}" for x, y in zip(xs, ys))
+
+    patrimony_line = coordinates([point.patrimony for point in points])
+    contributed_line = coordinates([point.cumulative_contributed for point in points])
+    last = points[-1]
+    gain_tone = "positive" if last.investment_gain >= 0 else "negative"
+    svg = (
+        f'<svg class="patrimony-chart" viewBox="0 0 {width} {height}" role="img" aria-label="Evolución del patrimonio, capital aportado y rendimiento de la inversión">'
+        f'<line x1="{padding}" y1="{height-padding}" x2="{width-padding}" y2="{height-padding}" class="chart-axis" />'
+        f'<polyline points="{contributed_line}" class="chart-line contributed" fill="none" />'
+        f'<polyline points="{patrimony_line}" class="chart-line patrimony" fill="none" />'
+        '</svg>'
+    )
+    return f'<section class="panel patrimony-evolution"><div class="panel-heading"><h2>Evolución patrimonial {tooltip("Compara el patrimonio real con el capital aportado. La diferencia representa el rendimiento acumulado de la inversión.")}</h2><span>{len(points)} puntos históricos</span></div>{svg}<div class="chart-legend"><span><i class="legend-dot patrimony"></i>Patrimonio</span><span><i class="legend-dot contributed"></i>Capital aportado</span></div><div class="evolution-summary"><div><span>Patrimonio actual</span><strong>{euro(last.patrimony)}</strong></div><div><span>Capital aportado</span><strong>{euro(last.cumulative_contributed)}</strong></div><div><span>Rendimiento acumulado</span><strong class="{gain_tone}">{euro(last.investment_gain)}</strong></div><div><span>Fecha</span><strong>{last.datetime.strftime("%d/%m/%Y")}</strong></div></div></section>'
 
 
 def metric(label: str, value: Decimal, tone: str = "") -> str:
