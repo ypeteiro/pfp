@@ -50,6 +50,14 @@ class PatrimonyHistory:
             raise ValueError("Provide either prices or price_provider, not both")
         provider = price_provider or MappingHistoricalPriceProvider(prices or {})
         capital_movements = external_cash_movements if capital_movements is None else capital_movements
+        if capital_movements is external_cash_movements:
+            trade_republic_movements = tuple(
+                movement
+                for movement in external_cash_movements
+                if movement.account_id == "Trade Republic"
+            )
+            if trade_republic_movements:
+                capital_movements = trade_republic_movements
         ordered_dates = sorted({_normalize_datetime(date) for date in dates})
         snapshots: list[PatrimonySnapshot] = []
 
