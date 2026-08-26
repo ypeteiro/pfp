@@ -24,13 +24,22 @@ class YahooFinanceHistoricalPriceProvider(HistoricalPriceProvider):
             ticker = yf.Ticker(yahoo_symbol)
             history = ticker.history(
                 start=at.date(),
-                end=at.date() + timedelta(days=1),
+                end=at.date() + timedelta(days=4),
                 auto_adjust=False,
             )
             if history.empty:
                 return None
 
-            close = history["Close"].iloc[0]
+            rows = [
+                (index, row)
+                for index, row in history.iterrows()
+                if index.date() <= at.date()
+            ]
+            if not rows:
+                return None
+
+            _, row = rows[-1]
+            close = row["Close"]
             currency = ticker.fast_info.get("currency")
             if close is None or currency is None:
                 return None
