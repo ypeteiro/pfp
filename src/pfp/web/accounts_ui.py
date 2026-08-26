@@ -53,12 +53,8 @@ def accounts_html(report: PortfolioReport) -> str:
     return f'''<div class="accounts-page">
 <h1>Cuentas</h1>
 <p class="muted">Consulta y modifica el efectivo de tus cuentas y registra traspasos entre ellas.</p>
-<div class="metric-grid">
-<div class="metric"><div class="metric-label">Efectivo invertible</div><strong>{_money(investable_cash)}</strong></div>
-<div class="metric"><div class="metric-label">Fondo de seguridad</div><strong>{_money(security_cash)}</strong></div>
-<div class="metric"><div class="metric-label">Efectivo total</div><strong>{_money(report.cash)}</strong></div>
-<div class="metric"><div class="metric-label">Patrimonio total</div><strong>{_money(report.total_value)}</strong></div>
-</div>
+{section("Efectivo invertible", investable)}
+{section("Fondo de seguridad", security)}
 <section class="panel accounts-section">
 <div class="panel-heading"><h2>Modificar saldo</h2><span>Se registra como movimiento externo para conservar el histórico.</span></div>
 <form method="post" action="/accounts/adjust" class="investment-form">
@@ -79,6 +75,4 @@ def accounts_html(report: PortfolioReport) -> str:
 <div class="form-actions"><button type="submit">Registrar traspaso</button></div>
 </form>
 </section>
-{section("Efectivo invertible", investable)}
-{section("Fondo de seguridad", security)}
 </div>'''
