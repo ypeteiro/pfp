@@ -39,6 +39,7 @@ class PatrimonyHistory:
         *,
         opening_cash: Decimal = Decimal("0"),
         external_cash_movements: list[ExternalCashMovement] | tuple[ExternalCashMovement, ...] = (),
+        capital_movements: list[ExternalCashMovement] | tuple[ExternalCashMovement, ...] | None = None,
         investments: list[Investment] | tuple[Investment, ...] = (),
         sales: list[Sale] | tuple[Sale, ...] = (),
         account_transfers: list[AccountTransfer] | tuple[AccountTransfer, ...] = (),
@@ -48,6 +49,7 @@ class PatrimonyHistory:
         if prices is not None and price_provider is not None:
             raise ValueError("Provide either prices or price_provider, not both")
         provider = price_provider or MappingHistoricalPriceProvider(prices or {})
+        capital_movements = external_cash_movements if capital_movements is None else capital_movements
         ordered_dates = sorted({_normalize_datetime(date) for date in dates})
         snapshots: list[PatrimonySnapshot] = []
 
@@ -60,6 +62,9 @@ class PatrimonyHistory:
             for movement in external_cash_movements:
                 if _normalize_datetime(movement.datetime) <= date:
                     cash += movement.amount
+
+            for movement in capital_movements:
+                if _normalize_datetime(movement.datetime) <= date:
                     contributed += movement.amount
 
             for transfer in account_transfers:
