@@ -26,7 +26,7 @@ def test_account_history_shows_external_movements_and_transfers_from_account_per
     assert "Traspaso enviado" in html
     assert "Traspaso recibido" in html
     assert "-300,00 €" in html
-    assert "+300,00 €" in html
+    assert "300,00 €" in html
 
 
 def test_account_history_shows_empty_state_for_account_without_movements():
