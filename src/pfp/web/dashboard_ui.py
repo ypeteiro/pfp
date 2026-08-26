@@ -101,12 +101,12 @@ def _evolution_summary(points: tuple[PatrimonyPoint, ...]) -> str:
     gain_tone = "positive" if last.investment_gain >= 0 else "negative"
     svg = (
         f'<svg class="patrimony-chart" viewBox="0 0 {width} {height}" role="img" aria-label="Evolución del patrimonio, capital aportado y rendimiento de la inversión">'
-        f'<line x1="{padding}" y1="{height-padding}" x2="{width-padding}" y2="{height-padding}" class="chart-axis" />'
-        f'<polyline points="{contributed_line}" class="chart-line contributed" fill="none" />'
-        f'<polyline points="{patrimony_line}" class="chart-line patrimony" fill="none" />'
+        f'<line x1="{padding}" y1="{height-padding}" x2="{width-padding}" y2="{height-padding}" style="stroke:#cbd5e1;stroke-width:1" />'
+        f'<polyline points="{contributed_line}" style="fill:none;stroke:#64748b;stroke-width:3;stroke-linecap:round;stroke-linejoin:round" />'
+        f'<polyline points="{patrimony_line}" style="fill:none;stroke:#2563eb;stroke-width:3;stroke-linecap:round;stroke-linejoin:round" />'
         '</svg>'
     )
-    return f'<section class="panel patrimony-evolution"><div class="panel-heading"><h2>Evolución patrimonial {tooltip("Compara el patrimonio real con el capital aportado. La diferencia representa el rendimiento acumulado de la inversión.")}</h2><span>{len(points)} puntos históricos</span></div>{svg}<div class="chart-legend"><span><i class="legend-dot patrimony"></i>Patrimonio</span><span><i class="legend-dot contributed"></i>Capital aportado</span></div><div class="evolution-summary"><div><span>Patrimonio actual</span><strong>{euro(last.patrimony)}</strong></div><div><span>Capital aportado</span><strong>{euro(last.cumulative_contributed)}</strong></div><div><span>Rendimiento acumulado</span><strong class="{gain_tone}">{euro(last.investment_gain)}</strong></div><div><span>Fecha</span><strong>{last.datetime.strftime("%d/%m/%Y")}</strong></div></div></section>'
+    return f'<section class="panel patrimony-evolution"><div class="panel-heading"><h2>Evolución patrimonial {tooltip("Compara el patrimonio real con el capital aportado. La diferencia representa el rendimiento acumulado de la inversión.")}</h2><span>{len(points)} puntos históricos</span></div>{svg}<div class="chart-legend"><span>● Patrimonio</span><span>● Capital aportado</span></div><div class="evolution-summary"><div><span>Patrimonio actual</span><strong>{euro(last.patrimony)}</strong></div><div><span>Capital aportado</span><strong>{euro(last.cumulative_contributed)}</strong></div><div><span>Rendimiento acumulado</span><strong class="{gain_tone}">{euro(last.investment_gain)}</strong></div><div><span>Fecha</span><strong>{last.datetime.strftime("%d/%m/%Y")}</strong></div></div></section>'
 
 
 def metric(label: str, value: Decimal, tone: str = "") -> str:
