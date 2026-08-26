@@ -27,7 +27,7 @@ def _account_row(account) -> str:
 
 def _account_options(accounts, selected: str | None = None) -> str:
     return "".join(
-        f'<option value="{account.id}"{" selected" if account.id == selected else ""}>{account.name} ({account.currency})</option>'
+        f'<option value="{account.account_id}"{" selected" if account.account_id == selected else ""}>{account.name} ({account.currency})</option>'
         for account in accounts
     )
 
