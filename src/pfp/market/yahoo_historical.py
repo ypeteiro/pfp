@@ -5,6 +5,7 @@ import yfinance as yf
 
 from pfp.market.currency import normalize_price
 from pfp.market.yahoo import YAHOO_CURRENCY_NORMALIZATION, YAHOO_SYMBOLS
+from pfp.market.yahoo_currency_rates import YahooCurrencyRateProvider
 from pfp.reporting.historical_prices import HistoricalPriceProvider
 
 
@@ -12,7 +13,7 @@ class YahooFinanceHistoricalPriceProvider(HistoricalPriceProvider):
     """Fetch historical closing prices from Yahoo Finance."""
 
     def __init__(self, currency_rate_provider=None):
-        self.currency_rate_provider = currency_rate_provider
+        self.currency_rate_provider = currency_rate_provider or YahooCurrencyRateProvider()
 
     def price(self, symbol: str, at: datetime) -> Decimal | None:
         yahoo_symbol = YAHOO_SYMBOLS.get(symbol)
@@ -20,7 +21,8 @@ class YahooFinanceHistoricalPriceProvider(HistoricalPriceProvider):
             return None
 
         try:
-            history = yf.Ticker(yahoo_symbol).history(
+            ticker = yf.Ticker(yahoo_symbol)
+            history = ticker.history(
                 start=at.date(),
                 end=at.date() + timedelta(days=1),
                 auto_adjust=False,
@@ -29,17 +31,15 @@ class YahooFinanceHistoricalPriceProvider(HistoricalPriceProvider):
                 return None
 
             close = history["Close"].iloc[0]
-            currency = yf.Ticker(yahoo_symbol).fast_info.get("currency")
+            currency = ticker.fast_info.get("currency")
             if close is None or currency is None:
                 return None
 
             normalized_currency = YAHOO_CURRENCY_NORMALIZATION.get(currency, currency)
             price = normalize_price(Decimal(str(close)), currency)
             if normalized_currency != "EUR":
-                if self.currency_rate_provider is None:
-                    return None
-                price *= self.currency_rate_provider.get_rate_at(
-                    normalized_currency, "EUR", at
+                price *= self.currency_rate_provider.get_rate(
+                    normalized_currency, "EUR"
                 )
             return price.quantize(Decimal("0.01"))
         except Exception:
