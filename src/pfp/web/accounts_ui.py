@@ -45,12 +45,16 @@ def accounts_html(report: PortfolioReport) -> str:
         rows = "".join(_account_row(account) for account in accounts)
         if not rows:
             rows = '<tr><td colspan="6" class="muted">No hay cuentas en esta categoría.</td></tr>'
-        return f'''<details class="accounts-collapsible account-balance-section">
-<summary><span><strong>{title}</strong><small>{len(accounts)} cuenta{'s' if len(accounts) != 1 else ''} · {_money(sum((account.balance for account in accounts), Decimal("0")))}</small></span><span class="collapse-chevron" aria-hidden="true">⌄</span></summary>
-<div class="accounts-collapsible-content">
-<section class="panel accounts-section">
+        return f'''<section class="panel accounts-section">
+<div class="panel-heading"><h2>{title}</h2><span>{len(accounts)} cuenta{'s' if len(accounts) != 1 else ''}</span></div>
 <div class="table-scroll"><table><thead><tr><th>Cuenta</th><th>Tipo</th><th>Efectivo</th><th>Coste invertido</th><th>Valor mercado</th><th>Patrimonio</th></tr></thead><tbody>{rows}</tbody></table></div>
-</section>
+</section>'''
+
+    detail = f'''<details class="accounts-collapsible">
+<summary><span><strong>Detalle</strong><small>Efectivo invertible y fondo de seguridad</small></span><span class="collapse-chevron" aria-hidden="true">⌄</span></summary>
+<div class="accounts-collapsible-content">
+{section("Efectivo invertible", investable)}
+{section("Fondo de seguridad", security)}
 </div>
 </details>'''
 
@@ -89,7 +93,6 @@ def accounts_html(report: PortfolioReport) -> str:
 <div class="metric"><div class="metric-label">Efectivo total</div><strong>{_money(report.cash)}</strong></div>
 <div class="metric"><div class="metric-label">Patrimonio total</div><strong>{_money(report.total_value)}</strong></div>
 </div>
-{section("Efectivo invertible", investable)}
-{section("Fondo de seguridad", security)}
+{detail}
 {operations}
 </div>'''
