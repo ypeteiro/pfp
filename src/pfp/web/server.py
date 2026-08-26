@@ -20,6 +20,7 @@ from pfp.domain.asset_catalog import AssetCatalog
 from pfp.domain.portfolio import Portfolio
 from pfp.domain.account_reconciliation_record import AccountReconciliationRecord
 from pfp.engine.account_reconciliation_engine import AccountReconciliationEngine
+from pfp.importers.account_opening_balance_repository import AccountOpeningBalanceRepository
 from pfp.importers.account_reconciliation_repository import AccountReconciliationRepository
 from pfp.importers.account_transfer_repository import AccountTransferRepository
 from pfp.importers.asset_repository import AssetRepository
@@ -27,6 +28,8 @@ from pfp.importers.external_cash_movement_repository import ExternalCashMovement
 from pfp.importers.investment_repository import InvestmentRepository
 from pfp.importers.sale_repository import SaleRepository
 from pfp.market.price_provider import CompositePriceProvider
+from pfp.market.yahoo_historical import YahooFinanceHistoricalPriceProvider
+from pfp.reporting.patrimony_history import PatrimonyHistory
 from pfp.reporting.portfolio_report import PortfolioReport
 from pfp.web.app import WebApp
 from pfp.web.rebalance_ui import rebalance_html
@@ -35,6 +38,7 @@ DEFAULT_ASSETS_FILE = Path("data/assets.csv")
 DEFAULT_RECONCILIATIONS_FILE = Path("data/accounts/reconciliation_history.csv")
 DEFAULT_EXTERNAL_CASH_MOVEMENTS_FILE = Path("data/accounts/external_cash_movements.csv")
 DEFAULT_ACCOUNT_TRANSFERS_FILE = Path("data/accounts/account_transfers.csv")
+DEFAULT_OPENING_BALANCES_FILE = Path("data/accounts/opening_balances.csv")
 
 
 def dashboard_html(report: PortfolioReport) -> str:
@@ -56,18 +60,44 @@ def _value_portfolio(portfolio: Portfolio, price_provider) -> Portfolio:
     return portfolio
 
 
-def build_web_report(movements_file: Path, investments_file: Path | None = None, sales_file: Path | None = None, price_provider=None, assets_file: Path | None = None) -> PortfolioReport:
+def _build_patrimony_series(portfolio, investments, sales, external_movements, account_transfers, historical_price_provider):
+    dates = {movement.datetime for movement in portfolio.movements}
+    dates.update(investment.datetime for investment in investments)
+    dates.update(sale.datetime for sale in sales)
+    dates.update(movement.datetime for movement in external_movements)
+    dates.update(transfer.datetime for transfer in account_transfers)
+    opening_balances = AccountOpeningBalanceRepository(DEFAULT_OPENING_BALANCES_FILE).load()
+    dates.update(datetime.combine(item.date, datetime.min.time()) for item in opening_balances)
+    if not dates:
+        return ()
+    return PatrimonyHistory.build(
+        sorted(dates),
+        opening_cash=sum((item.amount for item in opening_balances), Decimal("0")),
+        external_cash_movements=external_movements,
+        investments=investments,
+        sales=sales,
+        account_transfers=account_transfers,
+        price_provider=historical_price_provider,
+    )
+
+
+def build_web_report(movements_file: Path, investments_file: Path | None = None, sales_file: Path | None = None, price_provider=None, assets_file: Path | None = None, historical_price_provider=None) -> PortfolioReport:
     investments_file = investments_file or Path(DEFAULT_INVESTMENTS_FILE)
     sales_file = sales_file or Path(DEFAULT_SALES_FILE)
     assets_file = assets_file or DEFAULT_ASSETS_FILE
     price_provider = price_provider or CompositePriceProvider()
+    historical_price_provider = historical_price_provider or YahooFinanceHistoricalPriceProvider()
     _load_assets(AssetRepository(assets_file))
+    investments = InvestmentRepository(investments_file).load()
+    sales = SaleRepository(sales_file).load()
     portfolio = load_portfolio(movements_file, investments_file, sales_file)
     external_movements = ExternalCashMovementRepository(DEFAULT_EXTERNAL_CASH_MOVEMENTS_FILE).load()
+    account_transfers = AccountTransferRepository(DEFAULT_ACCOUNT_TRANSFERS_FILE).load()
     for movement in external_movements:
         RegisterExternalCashMovement().execute(portfolio, RegisterExternalCashMovementRequest(movement.datetime, movement.account_id, movement.amount, movement.currency, movement.description))
     portfolio = _value_portfolio(portfolio, price_provider)
-    return PortfolioReport.from_portfolio(portfolio, price_consulted_at=datetime.now().astimezone())
+    patrimony_series = _build_patrimony_series(portfolio, investments, sales, external_movements, account_transfers, historical_price_provider)
+    return PortfolioReport.from_portfolio(portfolio, price_consulted_at=datetime.now().astimezone(), patrimony_series=patrimony_series)
 
 
 @dataclass(slots=True)
@@ -79,6 +109,7 @@ class WebRuntime:
     asset_repository: AssetRepository | None = None
     external_cash_movement_repository: ExternalCashMovementRepository | None = None
     account_transfer_repository: AccountTransferRepository | None = None
+    historical_price_provider: object | None = None
 
     def register_investment(self, request: RegisterInvestmentRequest):
         if self.investment_repository is None:
@@ -121,10 +152,16 @@ class WebRuntime:
 
     def report(self) -> PortfolioReport:
         _value_portfolio(self.portfolio, self.price_provider)
-        return PortfolioReport.from_portfolio(self.portfolio, price_consulted_at=datetime.now().astimezone())
+        investments = self.investment_repository.load() if self.investment_repository is not None else ()
+        sales = self.sale_repository.load() if self.sale_repository is not None else ()
+        external_movements = self.external_cash_movement_repository.load() if self.external_cash_movement_repository is not None else ()
+        account_transfers = self.account_transfer_repository.load() if self.account_transfer_repository is not None else ()
+        historical_provider = self.historical_price_provider or YahooFinanceHistoricalPriceProvider()
+        patrimony_series = _build_patrimony_series(self.portfolio, investments, sales, external_movements, account_transfers, historical_provider)
+        return PortfolioReport.from_portfolio(self.portfolio, price_consulted_at=datetime.now().astimezone(), patrimony_series=patrimony_series)
 
 
-def build_web_runtime(movements_file: Path, investments_file: Path | None = None, sales_file: Path | None = None, price_provider=None, assets_file: Path | None = None) -> WebRuntime:
+def build_web_runtime(movements_file: Path, investments_file: Path | None = None, sales_file: Path | None = None, price_provider=None, assets_file: Path | None = None, historical_price_provider=None) -> WebRuntime:
     investments_file = investments_file or Path(DEFAULT_INVESTMENTS_FILE)
     sales_file = sales_file or Path(DEFAULT_SALES_FILE)
     assets_file = assets_file or DEFAULT_ASSETS_FILE
@@ -142,6 +179,7 @@ def build_web_runtime(movements_file: Path, investments_file: Path | None = None
         asset_repository,
         external_cash_movement_repository,
         AccountTransferRepository(DEFAULT_ACCOUNT_TRANSFERS_FILE),
+        historical_price_provider,
     )
 
 
