@@ -1,6 +1,14 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from pathlib import Path
+
+from pfp.importers.account_transfer_repository import AccountTransferRepository
+from pfp.importers.external_cash_movement_repository import ExternalCashMovementRepository
+
+
+DEFAULT_EXTERNAL_CASH_MOVEMENTS_FILE = Path("data/accounts/external_cash_movements.csv")
+DEFAULT_ACCOUNT_TRANSFERS_FILE = Path("data/accounts/account_transfers.csv")
 
 
 def _money(value: Decimal) -> str:
@@ -9,11 +17,13 @@ def _money(value: Decimal) -> str:
     return f"{sign}{value:,.2f} €".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
-def account_history_html(accounts, external_cash_movements, account_transfers) -> str:
-    account_names = {account.id: account.name for account in accounts}
-    for account in accounts:
-        account_names.setdefault(account.id, account.name)
+def account_history_html(accounts, external_cash_movements=None, account_transfers=None) -> str:
+    if external_cash_movements is None:
+        external_cash_movements = ExternalCashMovementRepository(DEFAULT_EXTERNAL_CASH_MOVEMENTS_FILE).load()
+    if account_transfers is None:
+        account_transfers = AccountTransferRepository(DEFAULT_ACCOUNT_TRANSFERS_FILE).load()
 
+    account_names = {account.id: account.name for account in accounts}
     sections = []
     for account in sorted(accounts, key=lambda item: (item.broker, item.name)):
         events = []
