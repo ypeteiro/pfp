@@ -21,8 +21,8 @@ def test_yahoo_historical_price_provider_returns_eur_close(monkeypatch):
 
     class Ticker:
         def history(self, **kwargs):
-            assert kwargs["start"] == WHEN.date()
-            assert kwargs["end"] == WHEN.date() + timedelta(days=4)
+            assert kwargs["start"] == WHEN.date() - timedelta(days=4)
+            assert kwargs["end"] == WHEN.date() + timedelta(days=1)
             assert kwargs["auto_adjust"] is False
             return History()
 
@@ -51,8 +51,8 @@ def test_yahoo_historical_price_provider_converts_usd_with_historical_rate(monke
 
     class Ticker:
         def history(self, **kwargs):
-            assert kwargs["start"] == WHEN.date()
-            assert kwargs["end"] == WHEN.date() + timedelta(days=4)
+            assert kwargs["start"] == WHEN.date() - timedelta(days=4)
+            assert kwargs["end"] == WHEN.date() + timedelta(days=1)
             assert kwargs["auto_adjust"] is False
             return History()
 
