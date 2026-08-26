@@ -8,27 +8,21 @@ WHEN = datetime(2026, 1, 15, 10)
 
 
 def test_yahoo_historical_price_provider_returns_eur_close(monkeypatch):
-    class Series:
-        class _ILoc:
-            def __getitem__(self, index):
-                assert index == 0
-                return Decimal("123.456")
-
-        @property
-        def iloc(self):
-            return self._ILoc()
+    class Row:
+        def __getitem__(self, key):
+            assert key == "Close"
+            return Decimal("123.456")
 
     class History:
         empty = False
 
-        def __getitem__(self, key):
-            assert key == "Close"
-            return Series()
+        def iterrows(self):
+            return iter(((WHEN, Row()),))
 
     class Ticker:
         def history(self, **kwargs):
             assert kwargs["start"] == WHEN.date()
-            assert kwargs["end"] == WHEN.date() + timedelta(days=1)
+            assert kwargs["end"] == WHEN.date() + timedelta(days=4)
             assert kwargs["auto_adjust"] is False
             return History()
 
@@ -44,27 +38,21 @@ def test_yahoo_historical_price_provider_returns_eur_close(monkeypatch):
 
 
 def test_yahoo_historical_price_provider_converts_usd_with_historical_rate(monkeypatch):
-    class Series:
-        class _ILoc:
-            def __getitem__(self, index):
-                assert index == 0
-                return Decimal("100")
-
-        @property
-        def iloc(self):
-            return self._ILoc()
+    class Row:
+        def __getitem__(self, key):
+            assert key == "Close"
+            return Decimal("100")
 
     class History:
         empty = False
 
-        def __getitem__(self, key):
-            assert key == "Close"
-            return Series()
+        def iterrows(self):
+            return iter(((WHEN, Row()),))
 
     class Ticker:
         def history(self, **kwargs):
             assert kwargs["start"] == WHEN.date()
-            assert kwargs["end"] == WHEN.date() + timedelta(days=1)
+            assert kwargs["end"] == WHEN.date() + timedelta(days=4)
             assert kwargs["auto_adjust"] is False
             return History()
 
