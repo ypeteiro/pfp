@@ -1,11 +1,12 @@
 """Presentation helpers for the PFP dashboard v2."""
 
-from datetime import date, datetime
+from datetime import datetime
 from decimal import Decimal
 from html import escape
 
 from pfp.domain.capital_flow import CapitalFlow, FlowType
 from pfp.excel.allocation_actions import build_allocation_rows
+from pfp.importers.trade_republic import TradeRepublicImporter
 from pfp.reporting.patrimony_evolution import PatrimonyEvolution
 from pfp.reporting.portfolio_report import PortfolioReport
 
@@ -73,12 +74,9 @@ def sort_heading(label: str, field: str, current: str, direction: str) -> str:
 
 
 def _evolution_from_report(report: PortfolioReport) -> PatrimonyEvolution:
-    flows = []
-    for movement in report.movements:
-        movement_type = movement.type.upper().strip()
-        if movement_type in {FlowType.CONTRIBUTION.value, FlowType.WITHDRAWAL.value}:
-            flows.append(CapitalFlow(movement.datetime, abs(movement.amount), FlowType(movement_type), movement.transaction_id))
-    return PatrimonyEvolution.from_capital_flows(flows)
+    return PatrimonyEvolution.from_capital_flows(
+        TradeRepublicImporter.capital_flows_from_movements(list(report.movements))
+    )
 
 
 def _evolution_summary(evolution: PatrimonyEvolution) -> str:
