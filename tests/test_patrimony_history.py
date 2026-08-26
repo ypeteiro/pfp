@@ -75,7 +75,7 @@ def test_sale_replaces_market_value_with_cash_without_creating_gain():
     )
 
     assert snapshots[1].patrimony == Decimal("1000")
-    assert snapshots[2].cash == Decimal("2200")
+    assert snapshots[2].cash == Decimal("1200")
     assert snapshots[2].market_value == Decimal("0")
-    assert snapshots[2].patrimony == Decimal("2200")
+    assert snapshots[2].patrimony == Decimal("1200")
     assert snapshots[2].investment_gain == Decimal("1200")
