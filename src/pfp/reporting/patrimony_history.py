@@ -1,7 +1,7 @@
 """Historical portfolio value reconstruction."""
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 
 from pfp.domain.account_transfer import AccountTransfer
@@ -9,6 +9,13 @@ from pfp.domain.external_cash_movement import ExternalCashMovement
 from pfp.domain.investment import Investment
 from pfp.domain.sale import Sale
 from pfp.reporting.historical_prices import HistoricalPriceProvider, MappingHistoricalPriceProvider
+
+
+def _normalize_datetime(value: datetime) -> datetime:
+    """Use naive UTC datetimes consistently inside historical reporting."""
+    if value.tzinfo is None:
+        return value
+    return value.astimezone(timezone.utc).replace(tzinfo=None)
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,7 +48,7 @@ class PatrimonyHistory:
         if prices is not None and price_provider is not None:
             raise ValueError("Provide either prices or price_provider, not both")
         provider = price_provider or MappingHistoricalPriceProvider(prices or {})
-        ordered_dates = sorted(set(dates))
+        ordered_dates = sorted({_normalize_datetime(date) for date in dates})
         snapshots: list[PatrimonySnapshot] = []
 
         for date in ordered_dates:
@@ -51,25 +58,24 @@ class PatrimonyHistory:
             invested_cost = Decimal("0")
 
             for movement in external_cash_movements:
-                if movement.datetime <= date:
+                if _normalize_datetime(movement.datetime) <= date:
                     cash += movement.amount
                     contributed += movement.amount
 
             for transfer in account_transfers:
-                if transfer.datetime <= date:
+                if _normalize_datetime(transfer.datetime) <= date:
                     # Internal transfers redistribute existing cash and therefore
                     # must not affect consolidated cash or cumulative contributions.
-                    # The consolidated history only needs to preserve total cash.
                     pass
 
             for investment in investments:
-                if investment.datetime <= date:
+                if _normalize_datetime(investment.datetime) <= date:
                     cash -= investment.amount
                     holdings[investment.symbol] = holdings.get(investment.symbol, Decimal("0")) + investment.shares
                     invested_cost += investment.amount
 
             for sale in sales:
-                if sale.datetime <= date:
+                if _normalize_datetime(sale.datetime) <= date:
                     cash += sale.amount
                     holdings[sale.symbol] = holdings.get(sale.symbol, Decimal("0")) - sale.shares
                     invested_cost -= sale.amount
