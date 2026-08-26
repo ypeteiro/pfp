@@ -8,21 +8,30 @@ WHEN = datetime(2026, 1, 15, 10)
 
 
 def test_yahoo_historical_price_provider_returns_eur_close(monkeypatch):
-    class History:
-        empty = False
-        def __getitem__(self, key):
-            return self
+    class Series:
+        class _ILoc:
+            def __getitem__(self, index):
+                assert index == 0
+                return Decimal("123.456")
+
         @property
         def iloc(self):
-            return self
-        def __getitem__(self, index):
-            return Decimal("123.456")
+            return self._ILoc()
+
+    class History:
+        empty = False
+
+        def __getitem__(self, key):
+            assert key == "Close"
+            return Series()
 
     class Ticker:
         def history(self, **kwargs):
             assert kwargs["start"] == WHEN.date()
             assert kwargs["end"] == WHEN.date()
+            assert kwargs["auto_adjust"] is False
             return History()
+
         @property
         def fast_info(self):
             return {"currency": "EUR"}
