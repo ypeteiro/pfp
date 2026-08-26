@@ -40,7 +40,10 @@ def dashboard_v2_html(report: PortfolioReport, sort: str = "weight", direction: 
         bars.append('<div class="allocation-row">' f'<div class="allocation-label"><span class="allocation-name">{escape(label)} {tooltip(tip)}</span><strong>{pct(row.current_weight)}</strong></div>' f'<div class="bar"><span style="width:{weight:.2f}%"></span></div>' f'<div class="allocation-meta">Objetivo {pct(row.target)} · {escape(row.action)}</div>' '</div>')
 
     positions = sort_positions(report, sort, direction)
-    position_rows = "".join(f'<tr><td>{escape(p.ticker or p.isin or p.symbol)}</td><td>{escape(p.name)}</td><td>{pct(p.weight)}</td><td>{euro(p.market_value)}</td><td>{euro(p.gain_loss)}</td></tr>' for p in positions[:10])
+    position_rows = "".join(
+        f'<tr><td>{escape(p.ticker or p.isin or p.symbol)}</td><td>{escape(p.name)}</td><td>{pct(p.weight)}</td><td>{euro(p.market_value)}</td><td class="{"positive" if p.gain_loss is not None and p.gain_loss > 0 else "negative" if p.gain_loss is not None and p.gain_loss < 0 else ""}">{euro(p.gain_loss)}</td></tr>'
+        for p in positions[:10]
+    )
     total_pl = report.realized_gain_loss + report.unrealized_gain_loss
     evolution_html = _evolution_summary(_evolution_from_report(report))
     consulted_at = report.price_consulted_at or datetime.now().astimezone()
