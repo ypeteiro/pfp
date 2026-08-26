@@ -11,6 +11,8 @@ from pfp.reporting.patrimony_history import PatrimonyHistory
 D1 = datetime(2026, 1, 1, 10)
 D2 = datetime(2026, 1, 2, 10)
 D3 = datetime(2026, 1, 3, 10)
+D4 = datetime(2026, 1, 4, 10)
+D5 = datetime(2026, 1, 5, 10)
 
 
 def test_external_contribution_increases_cash_and_contributed_capital():
@@ -79,3 +81,47 @@ def test_sale_replaces_market_value_with_cash_without_creating_gain():
     assert snapshots[2].market_value == Decimal("0")
     assert snapshots[2].patrimony == Decimal("1200")
     assert snapshots[2].investment_gain == Decimal("1200")
+
+
+def test_complete_history_separates_contributions_from_investment_performance():
+    snapshots = PatrimonyHistory.build(
+        [D1, D2, D3, D4, D5],
+        opening_cash=Decimal("0"),
+        external_cash_movements=[
+            ExternalCashMovement(D1, "abanca", Decimal("1000"), description="Primera aportación"),
+            ExternalCashMovement(D4, "abanca", Decimal("500"), description="Segunda aportación"),
+            ExternalCashMovement(D5, "abanca", Decimal("-200"), description="Retirada"),
+        ],
+        investments=[
+            Investment(D2, "VWCE", Decimal("10"), Decimal("1000"), Decimal("100"), "EQUITY"),
+        ],
+        prices={
+            D2: {"VWCE": Decimal("100")},
+            D3: {"VWCE": Decimal("120")},
+            D4: {"VWCE": Decimal("120")},
+            D5: {"VWCE": Decimal("130")},
+        },
+        account_transfers=[
+            AccountTransfer(D3, "abanca", "trade_republic", Decimal("300"), "EUR"),
+        ],
+    )
+
+    assert snapshots[0].patrimony == Decimal("1000")
+    assert snapshots[0].cumulative_contributed == Decimal("1000")
+    assert snapshots[0].investment_gain == Decimal("0")
+
+    assert snapshots[1].patrimony == Decimal("1000")
+    assert snapshots[1].cumulative_contributed == Decimal("1000")
+    assert snapshots[1].investment_gain == Decimal("0")
+
+    assert snapshots[2].patrimony == Decimal("1200")
+    assert snapshots[2].cumulative_contributed == Decimal("1000")
+    assert snapshots[2].investment_gain == Decimal("200")
+
+    assert snapshots[3].patrimony == Decimal("1700")
+    assert snapshots[3].cumulative_contributed == Decimal("1500")
+    assert snapshots[3].investment_gain == Decimal("200")
+
+    assert snapshots[4].patrimony == Decimal("1500")
+    assert snapshots[4].cumulative_contributed == Decimal("1300")
+    assert snapshots[4].investment_gain == Decimal("200")
