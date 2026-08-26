@@ -8,7 +8,7 @@ from pfp.domain.position import Position
 
 class PortfolioEngine:
 
-    def build(self, movements, prices=None, investments=None, sales=None, opening_balances=None, account_transfers=None):
+    def build(self, movements, prices=None, investments=None, sales=None, opening_balances=None, account_transfers=None, external_cash_movements=None):
         portfolio = Portfolio()
         portfolio.movements = movements
         accounts = {}
@@ -65,12 +65,7 @@ class PortfolioEngine:
                     continue
                 proceeds = movement.amount + movement.fee + movement.tax
                 self._apply_sell(portfolio, movement.symbol, movement.shares, proceeds)
-                operation_account = self._resolve_account_position_id(
-                    portfolio,
-                    key,
-                    movement.symbol,
-                    movement.shares,
-                )
+                operation_account = self._resolve_account_position_id(portfolio, key, movement.symbol, movement.shares)
                 self._apply_account_sell(portfolio, operation_account, movement.symbol, movement.shares, proceeds)
                 account_cash[operation_account] += proceeds
 
@@ -79,6 +74,13 @@ class PortfolioEngine:
                 key = opening_balance.account_id
                 ensure_account(key, key, opening_balance.currency)
                 account_cash[key] += opening_balance.amount
+
+        if external_cash_movements is not None:
+            for movement in external_cash_movements:
+                ensure_account(movement.account_id, movement.account_id, movement.currency)
+                if accounts[movement.account_id].currency != movement.currency:
+                    raise ValueError("External cash movement currency does not match account currency")
+                account_cash[movement.account_id] += movement.amount
 
         if account_transfers is not None:
             for transfer in account_transfers:
@@ -107,14 +109,7 @@ class PortfolioEngine:
                 self._apply_sell(portfolio, sale.symbol, sale.shares, sale.amount)
                 operation_account = resolve_operation_account(sale, "Trade Republic")
                 if operation_account is not None:
-                    self._apply_account_sell(
-                        portfolio,
-                        operation_account,
-                        sale.symbol,
-                        sale.shares,
-                        sale.amount,
-                        strict=False,
-                    )
+                    self._apply_account_sell(portfolio, operation_account, sale.symbol, sale.shares, sale.amount, strict=False)
                     account_cash[operation_account] += sale.amount
                 else:
                     unallocated_cash += sale.amount
