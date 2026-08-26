@@ -53,14 +53,26 @@ class YahooCurrencyRateProvider(CurrencyRateProvider):
         ticker = yf.Ticker(self._symbol(from_currency, to_currency))
         history = ticker.history(
             start=at,
-            end=at + timedelta(days=1),
+            end=at + timedelta(days=4),
             auto_adjust=False,
         )
         if history.empty:
             raise ValueError(
                 f"No currency rate available for {from_currency}/{to_currency} at {at}"
             )
-        close = history["Close"].iloc[-1]
+
+        rows = [
+            (index, row)
+            for index, row in history.iterrows()
+            if index.date() <= at
+        ]
+        if not rows:
+            raise ValueError(
+                f"No currency rate available for {from_currency}/{to_currency} at {at}"
+            )
+
+        _, row = rows[-1]
+        close = row["Close"]
         if close is None:
             raise ValueError(
                 f"No currency rate available for {from_currency}/{to_currency} at {at}"
