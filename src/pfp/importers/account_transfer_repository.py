@@ -7,6 +7,8 @@ from pfp.domain.account_transfer import AccountTransfer
 
 
 class AccountTransferRepository:
+    HEADER = ["datetime", "source_account", "destination_account", "amount", "currency"]
+
     def __init__(self, path):
         self.path = Path(path) if path is not None else None
 
@@ -26,3 +28,24 @@ class AccountTransferRepository:
                 )
                 for row in reader
             ]
+
+    def save(self, transfer):
+        if self.path is None:
+            raise ValueError("Account transfer path is required")
+
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        file_exists = self.path.exists()
+
+        with self.path.open("a", encoding="utf-8", newline="") as file:
+            writer = csv.DictWriter(file, fieldnames=self.HEADER)
+            if not file_exists:
+                writer.writeheader()
+            writer.writerow(
+                {
+                    "datetime": transfer.datetime.isoformat(),
+                    "source_account": transfer.source_account,
+                    "destination_account": transfer.destination_account,
+                    "amount": str(transfer.amount),
+                    "currency": transfer.currency,
+                }
+            )
