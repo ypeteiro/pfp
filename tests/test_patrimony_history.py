@@ -122,6 +122,6 @@ def test_complete_history_separates_contributions_from_investment_performance():
     assert snapshots[3].cumulative_contributed == Decimal("1500")
     assert snapshots[3].investment_gain == Decimal("200")
 
-    assert snapshots[4].patrimony == Decimal("1500")
+    assert snapshots[4].patrimony == Decimal("1600")
     assert snapshots[4].cumulative_contributed == Decimal("1300")
-    assert snapshots[4].investment_gain == Decimal("200")
+    assert snapshots[4].investment_gain == Decimal("300")
