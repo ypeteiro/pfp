@@ -38,8 +38,8 @@ class YahooFinanceHistoricalPriceProvider(HistoricalPriceProvider):
             normalized_currency = YAHOO_CURRENCY_NORMALIZATION.get(currency, currency)
             price = normalize_price(Decimal(str(close)), currency)
             if normalized_currency != "EUR":
-                price *= self.currency_rate_provider.get_rate(
-                    normalized_currency, "EUR"
+                price *= self.currency_rate_provider.get_rate_at(
+                    normalized_currency, "EUR", at.date()
                 )
             return price.quantize(Decimal("0.01"))
         except Exception:
