@@ -8,6 +8,7 @@ from pfp.domain.account_transfer import AccountTransfer
 from pfp.domain.external_cash_movement import ExternalCashMovement
 from pfp.domain.investment import Investment
 from pfp.domain.sale import Sale
+from pfp.reporting.historical_prices import HistoricalPriceProvider, MappingHistoricalPriceProvider
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,11 +23,7 @@ class PatrimonySnapshot:
 
 
 class PatrimonyHistory:
-    """Reconstructs portfolio state at supplied historical dates.
-
-    Prices are supplied by the caller, keeping this calculation deterministic
-    and independent from external price providers.
-    """
+    """Reconstructs portfolio state at supplied historical dates."""
 
     @classmethod
     def build(
@@ -39,8 +36,11 @@ class PatrimonyHistory:
         sales: list[Sale] | tuple[Sale, ...] = (),
         account_transfers: list[AccountTransfer] | tuple[AccountTransfer, ...] = (),
         prices: dict[datetime, dict[str, Decimal]] | None = None,
+        price_provider: HistoricalPriceProvider | None = None,
     ) -> tuple[PatrimonySnapshot, ...]:
-        price_history = prices or {}
+        if prices is not None and price_provider is not None:
+            raise ValueError("Provide either prices or price_provider, not both")
+        provider = price_provider or MappingHistoricalPriceProvider(prices or {})
         ordered_dates = sorted(set(dates))
         snapshots: list[PatrimonySnapshot] = []
 
@@ -67,14 +67,14 @@ class PatrimonyHistory:
                     holdings[sale.symbol] = holdings.get(sale.symbol, Decimal("0")) - sale.shares
                     invested_cost -= sale.amount
 
-            # Internal transfers only redistribute cash between accounts.
-            # They therefore have no effect on consolidated patrimony.
             _ = account_transfers
 
-            market_value = sum(
-                shares * price_history.get(date, {}).get(symbol, Decimal("0"))
-                for symbol, shares in holdings.items()
-            )
+            market_value = Decimal("0")
+            for symbol, shares in holdings.items():
+                price = provider.price(symbol, date)
+                if price is not None:
+                    market_value += shares * price
+
             patrimony = cash + market_value
             snapshots.append(
                 PatrimonySnapshot(
