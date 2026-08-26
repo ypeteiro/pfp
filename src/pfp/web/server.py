@@ -10,6 +10,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs
 
+from pfp.application.register_account_transfer import RegisterAccountTransfer, RegisterAccountTransferRequest
+from pfp.application.register_external_cash_movement import RegisterExternalCashMovement, RegisterExternalCashMovementRequest
 from pfp.application.register_investment import RegisterInvestment, RegisterInvestmentRequest
 from pfp.application.register_sale import RegisterSale, RegisterSaleRequest
 from pfp.cli import DEFAULT_INVESTMENTS_FILE, DEFAULT_SALES_FILE, load_portfolio
@@ -19,7 +21,9 @@ from pfp.domain.portfolio import Portfolio
 from pfp.domain.account_reconciliation_record import AccountReconciliationRecord
 from pfp.engine.account_reconciliation_engine import AccountReconciliationEngine
 from pfp.importers.account_reconciliation_repository import AccountReconciliationRepository
+from pfp.importers.account_transfer_repository import AccountTransferRepository
 from pfp.importers.asset_repository import AssetRepository
+from pfp.importers.external_cash_movement_repository import ExternalCashMovementRepository
 from pfp.importers.investment_repository import InvestmentRepository
 from pfp.importers.sale_repository import SaleRepository
 from pfp.market.price_provider import CompositePriceProvider
@@ -29,6 +33,8 @@ from pfp.web.rebalance_ui import rebalance_html
 
 DEFAULT_ASSETS_FILE = Path("data/assets.csv")
 DEFAULT_RECONCILIATIONS_FILE = Path("data/accounts/reconciliation_history.csv")
+DEFAULT_EXTERNAL_CASH_MOVEMENTS_FILE = Path("data/accounts/external_cash_movements.csv")
+DEFAULT_ACCOUNT_TRANSFERS_FILE = Path("data/accounts/account_transfers.csv")
 
 
 def dashboard_html(report: PortfolioReport) -> str:
@@ -57,6 +63,9 @@ def build_web_report(movements_file: Path, investments_file: Path | None = None,
     price_provider = price_provider or CompositePriceProvider()
     _load_assets(AssetRepository(assets_file))
     portfolio = load_portfolio(movements_file, investments_file, sales_file)
+    external_movements = ExternalCashMovementRepository(DEFAULT_EXTERNAL_CASH_MOVEMENTS_FILE).load()
+    for movement in external_movements:
+        RegisterExternalCashMovement().execute(portfolio, RegisterExternalCashMovementRequest(movement.datetime, movement.account_id, movement.amount, movement.currency, movement.description))
     portfolio = _value_portfolio(portfolio, price_provider)
     return PortfolioReport.from_portfolio(portfolio, price_consulted_at=datetime.now().astimezone())
 
@@ -68,6 +77,8 @@ class WebRuntime:
     investment_repository: InvestmentRepository | None = None
     sale_repository: SaleRepository | None = None
     asset_repository: AssetRepository | None = None
+    external_cash_movement_repository: ExternalCashMovementRepository | None = None
+    account_transfer_repository: AccountTransferRepository | None = None
 
     def register_investment(self, request: RegisterInvestmentRequest):
         if self.investment_repository is None:
@@ -94,6 +105,20 @@ class WebRuntime:
         self.asset_repository.save(asset)
         return asset
 
+    def register_external_cash_movement(self, request: RegisterExternalCashMovementRequest):
+        if self.external_cash_movement_repository is None:
+            raise RuntimeError("External cash movement repository is not configured")
+        movement = RegisterExternalCashMovement().execute(self.portfolio, request)
+        self.external_cash_movement_repository.save(movement)
+        return movement
+
+    def register_account_transfer(self, request: RegisterAccountTransferRequest):
+        if self.account_transfer_repository is None:
+            raise RuntimeError("Account transfer repository is not configured")
+        transfer = RegisterAccountTransfer().execute(self.portfolio, request)
+        self.account_transfer_repository.save(transfer)
+        return transfer
+
     def report(self) -> PortfolioReport:
         _value_portfolio(self.portfolio, self.price_provider)
         return PortfolioReport.from_portfolio(self.portfolio, price_consulted_at=datetime.now().astimezone())
@@ -106,7 +131,18 @@ def build_web_runtime(movements_file: Path, investments_file: Path | None = None
     asset_repository = AssetRepository(assets_file)
     _load_assets(asset_repository)
     portfolio = load_portfolio(movements_file, investments_file, sales_file)
-    return WebRuntime(portfolio, price_provider or CompositePriceProvider(), InvestmentRepository(investments_file), SaleRepository(sales_file), asset_repository)
+    external_cash_movement_repository = ExternalCashMovementRepository(DEFAULT_EXTERNAL_CASH_MOVEMENTS_FILE)
+    for movement in external_cash_movement_repository.load():
+        RegisterExternalCashMovement().execute(portfolio, RegisterExternalCashMovementRequest(movement.datetime, movement.account_id, movement.amount, movement.currency, movement.description))
+    return WebRuntime(
+        portfolio,
+        price_provider or CompositePriceProvider(),
+        InvestmentRepository(investments_file),
+        SaleRepository(sales_file),
+        asset_repository,
+        external_cash_movement_repository,
+        AccountTransferRepository(DEFAULT_ACCOUNT_TRANSFERS_FILE),
+    )
 
 
 def _required(form: dict[str, list[str]], name: str) -> str:
@@ -157,6 +193,32 @@ def parse_reconciliation_request(form: dict[str, list[str]]):
     if expected_balance < 0:
         raise ValueError("El saldo esperado no puede ser negativo")
     return _required(form, "account_id"), expected_balance
+
+
+def parse_account_adjustment_request(form: dict[str, list[str]]):
+    try:
+        when = datetime.fromisoformat(_required(form, "datetime"))
+        target_balance = Decimal(_required(form, "target_balance"))
+    except (ValueError, InvalidOperation) as exc:
+        raise ValueError("Fecha o saldo no válidos") from exc
+    if target_balance < 0:
+        raise ValueError("El saldo no puede ser negativo")
+    return _required(form, "account_id"), target_balance, when, (form.get("description", [""])[0].strip() or "Ajuste manual de saldo")
+
+
+def parse_account_transfer_request(form: dict[str, list[str]]) -> RegisterAccountTransferRequest:
+    try:
+        when = datetime.fromisoformat(_required(form, "datetime"))
+        amount = Decimal(_required(form, "amount"))
+    except (ValueError, InvalidOperation) as exc:
+        raise ValueError("Fecha o importe no válidos") from exc
+    return RegisterAccountTransferRequest(
+        datetime=when,
+        source_account=_required(form, "source_account"),
+        destination_account=_required(form, "destination_account"),
+        amount=amount,
+        currency=(form.get("currency", ["EUR"])[0].strip() or "EUR").upper(),
+    )
 
 
 def serve(movements_file: Path, host: str = "127.0.0.1", port: int = 8000, investments_file: Path | None = None, sales_file: Path | None = None, assets_file: Path | None = None, price_provider=None, reconciliations_file: Path | None = None) -> None:
@@ -210,7 +272,8 @@ def serve(movements_file: Path, host: str = "127.0.0.1", port: int = 8000, inves
 
         def do_POST(self):
             nonlocal app
-            if self.path not in {"/investments", "/sales", "/assets", "/reconcile"}:
+            allowed = {"/investments", "/sales", "/assets", "/reconcile", "/accounts/adjust", "/account-transfers"}
+            if self.path not in allowed:
                 self.send_error(404)
                 return
             form = {}
@@ -219,14 +282,21 @@ def serve(movements_file: Path, host: str = "127.0.0.1", port: int = 8000, inves
                 raw = self.rfile.read(length).decode("utf-8")
                 form = parse_qs(raw, keep_blank_values=True)
                 if self.path == "/investments":
-                    request = parse_investment_request(form)
-                    runtime.register_investment(request)
+                    runtime.register_investment(parse_investment_request(form))
                 elif self.path == "/sales":
-                    request = parse_sale_request(form)
-                    runtime.register_sale(request)
+                    runtime.register_sale(parse_sale_request(form))
                 elif self.path == "/assets":
-                    asset = parse_asset_request(form)
-                    runtime.register_asset(asset)
+                    runtime.register_asset(parse_asset_request(form))
+                elif self.path == "/accounts/adjust":
+                    account_id, target_balance, when, description = parse_account_adjustment_request(form)
+                    account = next((item for item in runtime.portfolio.accounts if item.id == account_id), None)
+                    if account is None:
+                        raise ValueError(f"Cuenta desconocida: {account_id}")
+                    delta = target_balance - account.balance
+                    if delta != 0:
+                        runtime.register_external_cash_movement(RegisterExternalCashMovementRequest(when, account_id, delta, account.currency, description))
+                elif self.path == "/account-transfers":
+                    runtime.register_account_transfer(parse_account_transfer_request(form))
                 else:
                     account_id, expected_balance = parse_reconciliation_request(form)
                     account = next((item for item in runtime.portfolio.accounts if item.id == account_id), None)
@@ -251,7 +321,7 @@ def serve(movements_file: Path, host: str = "127.0.0.1", port: int = 8000, inves
                     self.wfile.write(body)
                     return
                 app = WebApp(runtime.report(), AssetCatalog.all(), tuple(reconciliation_repository.load()), tuple(runtime.portfolio.accounts))
-                redirect = "/positions" if self.path != "/assets" else "/assets"
+                redirect = "/accounts" if self.path in {"/accounts/adjust", "/account-transfers"} else ("/positions" if self.path != "/assets" else "/assets")
             except (ValueError, InvalidOperation) as exc:
                 values = {key: values[0] if values else "" for key, values in form.items()}
                 if self.path == "/investments":
@@ -260,6 +330,8 @@ def serve(movements_file: Path, host: str = "127.0.0.1", port: int = 8000, inves
                     body = app.render_sale_form(str(exc), values).encode("utf-8")
                 elif self.path == "/reconcile":
                     body = app.render_reconciliation_form(str(exc), values, values.get("account_id")).encode("utf-8")
+                elif self.path in {"/accounts/adjust", "/account-transfers"}:
+                    body = app.render(path="/accounts").encode("utf-8")
                 else:
                     body = app.render_asset_form(str(exc), values).encode("utf-8")
                 self.send_response(400)
