@@ -17,6 +17,7 @@ from pfp.application.register_sale import RegisterSale, RegisterSaleRequest
 from pfp.cli import DEFAULT_INVESTMENTS_FILE, DEFAULT_SALES_FILE, load_portfolio
 from pfp.domain.asset import Asset
 from pfp.domain.asset_catalog import AssetCatalog
+from pfp.domain.external_cash_movement import ExternalCashMovement
 from pfp.domain.portfolio import Portfolio
 from pfp.domain.account_reconciliation_record import AccountReconciliationRecord
 from pfp.engine.account_reconciliation_engine import AccountReconciliationEngine
@@ -27,6 +28,7 @@ from pfp.importers.asset_repository import AssetRepository
 from pfp.importers.external_cash_movement_repository import ExternalCashMovementRepository
 from pfp.importers.investment_repository import InvestmentRepository
 from pfp.importers.sale_repository import SaleRepository
+from pfp.importers.trade_republic import TradeRepublicImporter
 from pfp.market.price_provider import CompositePriceProvider
 from pfp.market.yahoo_historical import YahooFinanceHistoricalPriceProvider
 from pfp.reporting.patrimony_history import PatrimonyHistory
@@ -66,11 +68,27 @@ def _history_datetime(value: datetime) -> datetime:
     return value
 
 
-def _build_patrimony_series(portfolio, investments, sales, external_movements, account_transfers, historical_price_provider):
+def _trade_republic_cash_movements(movements_file: Path) -> list[ExternalCashMovement]:
+    """Convert Trade Republic cash transfers into historical cash movements."""
+    flows = TradeRepublicImporter().load_capital_flows(movements_file)
+    return [
+        ExternalCashMovement(
+            datetime=_history_datetime(flow.datetime),
+            account_id="Trade Republic",
+            amount=flow.signed_amount,
+            currency="EUR",
+            description="Trade Republic capital flow",
+        )
+        for flow in flows
+    ]
+
+
+def _build_patrimony_series(portfolio, investments, sales, external_movements, account_transfers, historical_price_provider, trade_republic_movements=()):
     dates = {_history_datetime(movement.datetime) for movement in portfolio.movements}
     dates.update(_history_datetime(investment.datetime) for investment in investments)
     dates.update(_history_datetime(sale.datetime) for sale in sales)
     dates.update(_history_datetime(movement.datetime) for movement in external_movements)
+    dates.update(_history_datetime(movement.datetime) for movement in trade_republic_movements)
     dates.update(_history_datetime(transfer.datetime) for transfer in account_transfers)
     opening_balances = AccountOpeningBalanceRepository(DEFAULT_OPENING_BALANCES_FILE).load()
     dates.update(datetime.combine(item.date, datetime.min.time()) for item in opening_balances)
@@ -79,7 +97,7 @@ def _build_patrimony_series(portfolio, investments, sales, external_movements, a
     return PatrimonyHistory.build(
         sorted(dates),
         opening_cash=sum((item.amount for item in opening_balances), Decimal("0")),
-        external_cash_movements=external_movements,
+        external_cash_movements=[*external_movements, *trade_republic_movements],
         investments=investments,
         sales=sales,
         account_transfers=account_transfers,
@@ -98,11 +116,12 @@ def build_web_report(movements_file: Path, investments_file: Path | None = None,
     sales = SaleRepository(sales_file).load()
     portfolio = load_portfolio(movements_file, investments_file, sales_file)
     external_movements = ExternalCashMovementRepository(DEFAULT_EXTERNAL_CASH_MOVEMENTS_FILE).load()
-    account_transfers = AccountTransferRepository(DEFAULT_ACCOUNT_TRANSFERS_FILE).load()
+    trade_republic_movements = _trade_republic_cash_movements(movements_file)
     for movement in external_movements:
         RegisterExternalCashMovement().execute(portfolio, RegisterExternalCashMovementRequest(movement.datetime, movement.account_id, movement.amount, movement.currency, movement.description))
     portfolio = _value_portfolio(portfolio, price_provider)
-    patrimony_series = _build_patrimony_series(portfolio, investments, sales, external_movements, account_transfers, historical_price_provider)
+    account_transfers = AccountTransferRepository(DEFAULT_ACCOUNT_TRANSFERS_FILE).load()
+    patrimony_series = _build_patrimony_series(portfolio, investments, sales, external_movements, account_transfers, historical_price_provider, trade_republic_movements)
     return PortfolioReport.from_portfolio(portfolio, price_consulted_at=datetime.now().astimezone(), patrimony_series=patrimony_series)
 
 
@@ -163,7 +182,18 @@ class WebRuntime:
         external_movements = self.external_cash_movement_repository.load() if self.external_cash_movement_repository is not None else ()
         account_transfers = self.account_transfer_repository.load() if self.account_transfer_repository is not None else ()
         historical_provider = self.historical_price_provider or YahooFinanceHistoricalPriceProvider()
-        patrimony_series = _build_patrimony_series(self.portfolio, investments, sales, external_movements, account_transfers, historical_provider)
+        trade_republic_movements = [
+            ExternalCashMovement(
+                datetime=_history_datetime(movement.datetime),
+                account_id="Trade Republic",
+                amount=movement.amount,
+                currency=movement.currency,
+                description=movement.description,
+            )
+            for movement in self.portfolio.movements
+            if movement.category == "CASH" and movement.type.upper().endswith(("_INBOUND", "_OUTBOUND"))
+        ]
+        patrimony_series = _build_patrimony_series(self.portfolio, investments, sales, external_movements, account_transfers, historical_provider, trade_republic_movements)
         return PortfolioReport.from_portfolio(self.portfolio, price_consulted_at=datetime.now().astimezone(), patrimony_series=patrimony_series)
 
 
