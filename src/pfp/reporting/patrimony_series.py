@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 
-from pfp.reporting.patrimony_history import PatrimonyHistory, PatrimonySnapshot
+from pfp.reporting.patrimony_history import PatrimonySnapshot
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,8 +29,3 @@ class PatrimonySeries:
             )
             for snapshot in snapshots
         )
-
-    @classmethod
-    def from_history(cls, history: PatrimonyHistory) -> tuple[PatrimonyPoint, ...]:
-        """Build a presentation series from a precomputed history."""
-        return cls.build(history)
