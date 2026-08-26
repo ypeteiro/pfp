@@ -31,7 +31,9 @@ def test_account_history_shows_external_movements_and_transfers_from_account_per
 
 def test_account_history_shows_empty_state_for_account_without_movements():
     accounts = [Account("ABANCA", "ABANCA", account_id="abanca", balance=Decimal("1000"))]
+    unrelated_movement = ExternalCashMovement(datetime(2026, 8, 20, 10, 0), "other", Decimal("100"))
+    unrelated_transfer = AccountTransfer(datetime(2026, 8, 21, 10, 0), "other", "another", Decimal("50"), "EUR")
 
-    html = account_history_html(accounts, [], [])
+    html = account_history_html(accounts, [unrelated_movement], [unrelated_transfer])
 
     assert "No hay movimientos registrados." in html
