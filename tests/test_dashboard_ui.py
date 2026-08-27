@@ -39,7 +39,7 @@ def test_dashboard_v2_colors_position_pnl_by_sign():
     assert '<td class="negative">-20,00 €</td>' in html
 
 
-def test_dashboard_v2_renders_distinct_patrimony_evolution_series_and_timeline():
+def test_dashboard_v2_renders_readable_patrimony_evolution_series_and_timeline():
     points = (
         PatrimonyPoint(datetime(2026, 1, 10), Decimal("1000"), Decimal("1000"), Decimal("0"), Decimal("0")),
         PatrimonyPoint(datetime(2026, 2, 10), Decimal("1800"), Decimal("1500"), Decimal("300"), Decimal("1200")),
@@ -64,7 +64,8 @@ def test_dashboard_v2_renders_distinct_patrimony_evolution_series_and_timeline()
     assert "1.000,00 €" in html
     assert "1.700,00 €" in html
     assert "2.400,00 €" in html
-    assert "chart-grid" in html
-    assert "chart-series patrimony" in html
-    assert "chart-series contributed" in html
-    assert "chart-series invested" in html
+    assert "stroke-dasharray:8 6" in html
+    assert "stroke-dasharray:2 5" in html
+    assert "Patrimonio · 2.400,00 €" in html
+    assert "Invertido · 1.700,00 €" in html
+    assert "Capital aportado · 2.000,00 €" in html
