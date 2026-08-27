@@ -13,6 +13,7 @@ class PatrimonyPoint:
     patrimony: Decimal
     cumulative_contributed: Decimal
     investment_gain: Decimal
+    market_value: Decimal = Decimal("0")
 
 
 class PatrimonySeries:
@@ -22,10 +23,11 @@ class PatrimonySeries:
     def build(cls, snapshots: tuple[PatrimonySnapshot, ...]) -> tuple[PatrimonyPoint, ...]:
         return tuple(
             PatrimonyPoint(
-                snapshot.datetime,
-                snapshot.patrimony,
-                snapshot.cumulative_contributed,
-                snapshot.investment_gain,
+                datetime=snapshot.datetime,
+                patrimony=snapshot.patrimony,
+                cumulative_contributed=snapshot.cumulative_contributed,
+                investment_gain=snapshot.investment_gain,
+                market_value=snapshot.market_value,
             )
             for snapshot in snapshots
         )
