@@ -13,6 +13,7 @@ class PatrimonyPoint:
     patrimony: Decimal
     cumulative_contributed: Decimal
     investment_gain: Decimal
+    invested_cost: Decimal = Decimal("0")
     market_value: Decimal = Decimal("0")
 
 
@@ -27,6 +28,7 @@ class PatrimonySeries:
                 patrimony=snapshot.patrimony,
                 cumulative_contributed=snapshot.cumulative_contributed,
                 investment_gain=snapshot.investment_gain,
+                invested_cost=snapshot.invested_cost,
                 market_value=snapshot.market_value,
             )
             for snapshot in snapshots
