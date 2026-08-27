@@ -32,6 +32,7 @@ def test_build_web_report_uses_consolidated_loader_and_market_prices(monkeypatch
         return portfolio
 
     monkeypatch.setattr("pfp.web.server.load_portfolio", fake_load_portfolio)
+    monkeypatch.setattr("pfp.web.server._trade_republic_cash_movements", lambda movements_file: [])
 
     report = build_web_report(
         Path("movements.csv"),
