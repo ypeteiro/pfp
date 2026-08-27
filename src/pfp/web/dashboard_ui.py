@@ -79,34 +79,84 @@ def _evolution_summary(points: tuple[PatrimonyPoint, ...]) -> str:
     if not points:
         return '<section class="panel patrimony-evolution"><div class="panel-heading"><h2>Evolución patrimonial</h2></div><p class="muted">Todavía no hay suficientes datos históricos para mostrar la evolución.</p></section>'
 
-    width, height, padding = 720, 220, 34
-    values = [value for point in points for value in (point.patrimony, point.cumulative_contributed)]
-    if not values:
-        return '<section class="panel patrimony-evolution"><div class="panel-heading"><h2>Evolución patrimonial</h2></div><p class="muted">Sin datos históricos.</p></section>'
-    minimum = min(Decimal("0"), min(values))
-    maximum = max(Decimal("1"), max(values))
+    width, height = 900, 360
+    left, right, top, bottom = 72, 24, 24, 58
+    plot_width = width - left - right
+    plot_height = height - top - bottom
+    series = (
+        ("patrimony", "Patrimonio", [point.patrimony for point in points], "#2563eb"),
+        ("contributed", "Capital aportado", [point.cumulative_contributed for point in points], "#64748b"),
+        ("invested", "Invertido", [point.market_value for point in points], "#059669"),
+    )
+    all_values = [value for _, _, values, _ in series for value in values]
+    minimum = min(Decimal("0"), min(all_values))
+    maximum = max(Decimal("1"), max(all_values))
     span = maximum - minimum or Decimal("1")
 
-    def coordinates(values_for_line):
-        if len(points) == 1:
-            xs = [width / 2]
-        else:
-            xs = [padding + index * (width - 2 * padding) / (len(points) - 1) for index in range(len(points))]
-        ys = [height - padding - float((value - minimum) / span) * (height - 2 * padding) for value in values_for_line]
-        return " ".join(f"{x:.1f},{y:.1f}" for x, y in zip(xs, ys))
+    if len(points) == 1:
+        xs = [left + plot_width / 2]
+    else:
+        xs = [left + index * plot_width / (len(points) - 1) for index in range(len(points))]
 
-    patrimony_line = coordinates([point.patrimony for point in points])
-    contributed_line = coordinates([point.cumulative_contributed for point in points])
+    def y_for(value: Decimal) -> float:
+        return top + plot_height - float((value - minimum) / span) * plot_height
+
+    def polyline(values: list[Decimal]) -> str:
+        return " ".join(f"{x:.1f},{y_for(value):.1f}" for x, value in zip(xs, values))
+
+    tick_count = 5
+    ticks = []
+    for index in range(tick_count):
+        ratio = Decimal(index) / Decimal(tick_count - 1)
+        value = maximum - ratio * span
+        y = y_for(value)
+        ticks.append(
+            f'<line class="chart-grid" x1="{left}" y1="{y:.1f}" x2="{width-right}" y2="{y:.1f}" />'
+            f'<text class="chart-axis-label" x="{left-10}" y="{y+4:.1f}" text-anchor="end">{escape(euro(value))}</text>'
+        )
+
+    label_count = min(6, len(points))
+    label_indexes = sorted({round(index * (len(points) - 1) / (label_count - 1)) for index in range(label_count)}) if label_count > 1 else [0]
+    date_labels = []
+    for index in label_indexes:
+        x = xs[index]
+        date = points[index].datetime.strftime("%d/%m/%y")
+        date_labels.append(
+            f'<line class="chart-tick" x1="{x:.1f}" y1="{height-bottom}" x2="{x:.1f}" y2="{height-bottom+6}" />'
+            f'<text class="chart-axis-label" x="{x:.1f}" y="{height-18}" text-anchor="middle">{escape(date)}</text>'
+        )
+
+    point_titles = []
+    for index, point in enumerate(points):
+        title = escape(
+            f'{point.datetime.strftime("%d/%m/%Y")}: Patrimonio {euro(point.patrimony)} · '
+            f'Aportado {euro(point.cumulative_contributed)} · Invertido {euro(point.market_value)}'
+        )
+        point_titles.append(
+            f'<circle class="chart-point patrimony-point" cx="{xs[index]:.1f}" cy="{y_for(point.patrimony):.1f}" r="4"><title>{title}</title></circle>'
+            f'<circle class="chart-point contributed-point" cx="{xs[index]:.1f}" cy="{y_for(point.cumulative_contributed):.1f}" r="3"><title>{title}</title></circle>'
+            f'<circle class="chart-point invested-point" cx="{xs[index]:.1f}" cy="{y_for(point.market_value):.1f}" r="3"><title>{title}</title></circle>'
+        )
+
+    lines = "".join(
+        f'<polyline class="chart-series {key}" points="{polyline(values)}" style="stroke:{stroke}" />'
+        for key, _, values, stroke in series
+    )
+    legend = "".join(
+        f'<span class="chart-legend-item {key}"><i aria-hidden="true"></i>{label}</span>'
+        for key, label, _, _ in series
+    )
     last = points[-1]
     gain_tone = "positive" if last.investment_gain >= 0 else "negative"
     svg = (
-        f'<svg class="patrimony-chart" viewBox="0 0 {width} {height}" role="img" aria-label="Evolución del patrimonio, capital aportado y rendimiento de la inversión">'
-        f'<line x1="{padding}" y1="{height-padding}" x2="{width-padding}" y2="{height-padding}" style="stroke:#cbd5e1;stroke-width:1" />'
-        f'<polyline points="{contributed_line}" style="fill:none;stroke:#64748b;stroke-width:3;stroke-linecap:round;stroke-linejoin:round" />'
-        f'<polyline points="{patrimony_line}" style="fill:none;stroke:#2563eb;stroke-width:3;stroke-linecap:round;stroke-linejoin:round" />'
-        '</svg>'
+        f'<div class="patrimony-chart-wrap"><svg class="patrimony-chart" viewBox="0 0 {width} {height}" role="img" aria-label="Evolución temporal del patrimonio, capital aportado y dinero invertido">'
+        f'{"".join(ticks)}'
+        f'<line class="chart-axis" x1="{left}" y1="{top}" x2="{left}" y2="{height-bottom}" />'
+        f'<line class="chart-axis" x1="{left}" y1="{height-bottom}" x2="{width-right}" y2="{height-bottom}" />'
+        f'{"".join(date_labels)}{lines}{"".join(point_titles)}'
+        '</svg></div>'
     )
-    return f'<section class="panel patrimony-evolution"><div class="panel-heading"><h2>Evolución patrimonial {tooltip("Compara el patrimonio real con el capital aportado. La diferencia representa el rendimiento acumulado de la inversión.")}</h2><span>{len(points)} puntos históricos</span></div>{svg}<div class="chart-legend"><span>● Patrimonio</span><span>● Capital aportado</span></div><div class="evolution-summary"><div><span>Patrimonio actual</span><strong>{euro(last.patrimony)}</strong></div><div><span>Capital aportado</span><strong>{euro(last.cumulative_contributed)}</strong></div><div><span>Rendimiento acumulado</span><strong class="{gain_tone}">{euro(last.investment_gain)}</strong></div><div><span>Fecha</span><strong>{last.datetime.strftime("%d/%m/%Y")}</strong></div></div></section>'
+    return f'<section class="panel patrimony-evolution"><div class="panel-heading"><div><h2>Evolución patrimonial {tooltip("Patrimonio = efectivo + valor de mercado. Capital aportado = aportaciones netas. Invertido = valor de mercado de las posiciones.")}</h2><p class="muted evolution-description">Compara cuánto has aportado con cuánto tienes invertido y con tu patrimonio total.</p></div><span>{len(points)} puntos históricos</span></div>{svg}<div class="chart-legend">{legend}</div><div class="evolution-summary"><div><span>Patrimonio actual</span><strong>{euro(last.patrimony)}</strong></div><div><span>Capital aportado</span><strong>{euro(last.cumulative_contributed)}</strong></div><div><span>Invertido</span><strong>{euro(last.market_value)}</strong></div><div><span>Rendimiento acumulado</span><strong class="{gain_tone}">{euro(last.investment_gain)}</strong></div></div></section>'
 
 
 def metric(label: str, value: Decimal, tone: str = "") -> str:
