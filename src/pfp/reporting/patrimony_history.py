@@ -65,7 +65,7 @@ class PatrimonyHistory:
             cash = opening_cash
             contributed = Decimal("0")
             holdings: dict[str, Decimal] = {}
-            invested_cost = Decimal("0")
+            cost_basis: dict[str, Decimal] = {}
 
             for movement in external_cash_movements:
                 if _normalize_datetime(movement.datetime) <= date:
@@ -85,14 +85,20 @@ class PatrimonyHistory:
                 if _normalize_datetime(investment.datetime) <= date:
                     cash -= investment.amount
                     holdings[investment.symbol] = holdings.get(investment.symbol, Decimal("0")) + investment.shares
-                    invested_cost += investment.amount
+                    cost_basis[investment.symbol] = cost_basis.get(investment.symbol, Decimal("0")) + investment.amount
 
             for sale in sales:
                 if _normalize_datetime(sale.datetime) <= date:
                     cash += sale.amount
-                    holdings[sale.symbol] = holdings.get(sale.symbol, Decimal("0")) - sale.shares
-                    invested_cost -= sale.amount
+                    held_shares = holdings.get(sale.symbol, Decimal("0"))
+                    held_cost = cost_basis.get(sale.symbol, Decimal("0"))
+                    if held_shares <= 0 or sale.shares > held_shares:
+                        raise ValueError(f"Sale shares exceed historical position for: {sale.symbol}")
+                    sold_cost = held_cost * sale.shares / held_shares
+                    holdings[sale.symbol] = held_shares - sale.shares
+                    cost_basis[sale.symbol] = held_cost - sold_cost
 
+            invested_cost = sum(cost_basis.values(), Decimal("0"))
             market_value = Decimal("0")
             for symbol, shares in holdings.items():
                 price = provider.price(symbol, date)

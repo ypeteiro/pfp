@@ -38,8 +38,10 @@ def test_investment_purchase_changes_cash_into_market_value_without_changing_pat
 
     assert snapshots[1].cash == Decimal("0")
     assert snapshots[1].market_value == Decimal("1000")
+    assert snapshots[1].invested_cost == Decimal("1000")
     assert snapshots[1].patrimony == Decimal("1000")
     assert snapshots[2].market_value == Decimal("1100")
+    assert snapshots[2].invested_cost == Decimal("1000")
     assert snapshots[2].patrimony == Decimal("1100")
     assert snapshots[2].investment_gain == Decimal("1100")
 
@@ -67,6 +69,22 @@ def test_internal_transfer_does_not_change_consolidated_patrimony():
     assert snapshots[1].patrimony == Decimal("1000")
 
 
+def test_sale_reduces_invested_capital_by_cost_basis_not_sale_proceeds():
+    snapshots = PatrimonyHistory.build(
+        [D1, D2, D3],
+        opening_cash=Decimal("1000"),
+        investments=[Investment(D2, "VWCE", Decimal("10"), Decimal("1000"), Decimal("100"), "EQUITY")],
+        sales=[Sale(D3, "VWCE", Decimal("5"), Decimal("600"), Decimal("120"))],
+        prices={D2: {"VWCE": Decimal("100")}, D3: {"VWCE": Decimal("120")}},
+    )
+
+    assert snapshots[1].invested_cost == Decimal("1000")
+    assert snapshots[2].cash == Decimal("1600")
+    assert snapshots[2].market_value == Decimal("600")
+    assert snapshots[2].invested_cost == Decimal("500")
+    assert snapshots[2].patrimony == Decimal("2200")
+
+
 def test_sale_replaces_market_value_with_cash_without_creating_gain():
     snapshots = PatrimonyHistory.build(
         [D1, D2, D3],
@@ -77,10 +95,11 @@ def test_sale_replaces_market_value_with_cash_without_creating_gain():
     )
 
     assert snapshots[1].patrimony == Decimal("1000")
-    assert snapshots[2].cash == Decimal("1200")
+    assert snapshots[2].cash == Decimal("2200")
     assert snapshots[2].market_value == Decimal("0")
-    assert snapshots[2].patrimony == Decimal("1200")
-    assert snapshots[2].investment_gain == Decimal("1200")
+    assert snapshots[2].invested_cost == Decimal("0")
+    assert snapshots[2].patrimony == Decimal("2200")
+    assert snapshots[2].investment_gain == Decimal("2200")
 
 
 def test_complete_history_separates_contributions_from_investment_performance():
