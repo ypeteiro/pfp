@@ -38,6 +38,7 @@ class PatrimonyHistory:
         dates: list[datetime] | tuple[datetime, ...],
         *,
         opening_cash: Decimal = Decimal("0"),
+        opening_cash_movements: list[ExternalCashMovement] | tuple[ExternalCashMovement, ...] = (),
         external_cash_movements: list[ExternalCashMovement] | tuple[ExternalCashMovement, ...] = (),
         capital_movements: list[ExternalCashMovement] | tuple[ExternalCashMovement, ...] | None = None,
         investments: list[Investment] | tuple[Investment, ...] = (),
@@ -63,9 +64,16 @@ class PatrimonyHistory:
 
         for date in ordered_dates:
             cash = opening_cash
+            opening_capital = opening_cash
             contributed = Decimal("0")
             holdings: dict[str, Decimal] = {}
             cost_basis: dict[str, Decimal] = {}
+            realized_gain = Decimal("0")
+
+            for movement in opening_cash_movements:
+                if _normalize_datetime(movement.datetime) <= date:
+                    cash += movement.amount
+                    opening_capital += movement.amount
 
             for movement in external_cash_movements:
                 if _normalize_datetime(movement.datetime) <= date:
@@ -81,22 +89,35 @@ class PatrimonyHistory:
                     # must not affect consolidated cash or cumulative contributions.
                     pass
 
-            for investment in investments:
-                if _normalize_datetime(investment.datetime) <= date:
+            events = [
+                (investment.datetime, 0, investment)
+                for investment in investments
+                if _normalize_datetime(investment.datetime) <= date
+            ]
+            events.extend(
+                (sale.datetime, 1, sale)
+                for sale in sales
+                if _normalize_datetime(sale.datetime) <= date
+            )
+            events.sort(key=lambda event: (_normalize_datetime(event[0]), event[1]))
+
+            for _, event_type, event in events:
+                if event_type == 0:
+                    investment = event
                     cash -= investment.amount
                     holdings[investment.symbol] = holdings.get(investment.symbol, Decimal("0")) + investment.shares
                     cost_basis[investment.symbol] = cost_basis.get(investment.symbol, Decimal("0")) + investment.amount
-
-            for sale in sales:
-                if _normalize_datetime(sale.datetime) <= date:
-                    cash += sale.amount
+                else:
+                    sale = event
                     held_shares = holdings.get(sale.symbol, Decimal("0"))
                     held_cost = cost_basis.get(sale.symbol, Decimal("0"))
                     if held_shares <= 0 or sale.shares > held_shares:
                         raise ValueError(f"Sale shares exceed historical position for: {sale.symbol}")
                     sold_cost = held_cost * sale.shares / held_shares
+                    cash += sale.amount
                     holdings[sale.symbol] = held_shares - sale.shares
                     cost_basis[sale.symbol] = held_cost - sold_cost
+                    realized_gain += sale.amount - sold_cost
 
             invested_cost = sum(cost_basis.values(), Decimal("0"))
             market_value = Decimal("0")
@@ -106,6 +127,7 @@ class PatrimonyHistory:
                     market_value += shares * price
 
             patrimony = cash + market_value
+            investment_gain = patrimony - opening_capital - contributed
             snapshots.append(
                 PatrimonySnapshot(
                     date,
@@ -114,7 +136,7 @@ class PatrimonyHistory:
                     market_value,
                     patrimony,
                     contributed,
-                    patrimony - contributed,
+                    investment_gain,
                 )
             )
 
