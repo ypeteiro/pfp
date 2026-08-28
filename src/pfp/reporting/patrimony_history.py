@@ -89,9 +89,6 @@ class PatrimonyHistory:
                     investments=list(applicable_investments),
                     sales=list(applicable_sales),
                 )
-                # Trade Republic movements are already represented in the
-                # historical portfolio. Add only external cash movements from
-                # other accounts to avoid counting TR transfers twice.
                 cash = opening_cash + sum(
                     (
                         movement.amount
@@ -105,22 +102,20 @@ class PatrimonyHistory:
                 holdings = historical_portfolio.positions
             else:
                 cash = opening_cash
+                cumulative_invested = Decimal("0")
+                holdings: dict[str, Decimal] = {}
                 for movement in ordered_external:
                     if _normalize_datetime(movement.datetime) <= date:
                         cash += movement.amount
-                invested_cost = Decimal("0")
-                holdings = {}
                 for investment in applicable_investments:
                     cash -= investment.amount
-                    invested_cost += investment.amount
-                    position = holdings.get(investment.symbol)
-                    if position is None:
-                        holdings[investment.symbol] = investment
-                    else:
-                        holdings[investment.symbol] = investment
+                    holdings[investment.symbol] = holdings.get(investment.symbol, Decimal("0")) + investment.shares
+                    cumulative_invested += investment.amount
                 for sale in applicable_sales:
                     cash += sale.amount
-                    invested_cost -= sale.amount
+                    holdings[sale.symbol] = holdings.get(sale.symbol, Decimal("0")) - sale.shares
+                    cumulative_invested -= sale.amount
+                invested_cost = cumulative_invested
 
             cumulative_contributed = Decimal("0")
             for flow in ordered_capital:
@@ -134,10 +129,10 @@ class PatrimonyHistory:
                     if price is not None:
                         market_value += position.shares * price
             else:
-                for symbol, investment in holdings.items():
+                for symbol, shares in holdings.items():
                     price = provider.price(symbol, date)
                     if price is not None:
-                        market_value += investment.shares * price
+                        market_value += shares * price
 
             patrimony = cash + market_value
             snapshots.append(
