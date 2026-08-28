@@ -4,7 +4,7 @@ from pathlib import Path
 from pfp.cli import load_portfolio
 
 
-MOVEMENTS_FILE = Path("data/imports/trade_republic.csv")
+MOVEMENTS_FILE = Path("tests/fixtures/trade_republic.csv")
 OPENING_BALANCES_FILE = Path("data/accounts/abanca_ahorro_opening_balance.csv")
 
 
