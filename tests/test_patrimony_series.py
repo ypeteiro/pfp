@@ -17,9 +17,9 @@ def test_build_exposes_chart_values_in_history_order():
 
     points = PatrimonySeries.build(snapshots)
 
-    assert [(point.datetime, point.patrimony, point.cumulative_contributed, point.investment_gain) for point in points] == [
-        (D1, Decimal("100"), Decimal("100"), Decimal("0")),
-        (D2, Decimal("200"), Decimal("100"), Decimal("100")),
+    assert [(point.datetime, point.patrimony, point.cumulative_contributed, point.investment_gain, point.market_value) for point in points] == [
+        (D1, Decimal("100"), Decimal("100"), Decimal("0"), Decimal("100")),
+        (D2, Decimal("200"), Decimal("100"), Decimal("100"), Decimal("150")),
     ]
 
 
