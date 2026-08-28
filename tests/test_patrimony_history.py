@@ -79,10 +79,10 @@ def test_sale_reduces_invested_capital_by_cost_basis_not_sale_proceeds():
     )
 
     assert snapshots[1].invested_cost == Decimal("1000")
-    assert snapshots[2].cash == Decimal("1600")
+    assert snapshots[2].cash == Decimal("600")
     assert snapshots[2].market_value == Decimal("600")
     assert snapshots[2].invested_cost == Decimal("500")
-    assert snapshots[2].patrimony == Decimal("2200")
+    assert snapshots[2].patrimony == Decimal("1200")
 
 
 def test_sale_replaces_market_value_with_cash_without_creating_gain():
@@ -95,11 +95,11 @@ def test_sale_replaces_market_value_with_cash_without_creating_gain():
     )
 
     assert snapshots[1].patrimony == Decimal("1000")
-    assert snapshots[2].cash == Decimal("2200")
+    assert snapshots[2].cash == Decimal("1200")
     assert snapshots[2].market_value == Decimal("0")
     assert snapshots[2].invested_cost == Decimal("0")
-    assert snapshots[2].patrimony == Decimal("2200")
-    assert snapshots[2].investment_gain == Decimal("2200")
+    assert snapshots[2].patrimony == Decimal("1200")
+    assert snapshots[2].investment_gain == Decimal("1200")
 
 
 def test_complete_history_separates_contributions_from_investment_performance():
