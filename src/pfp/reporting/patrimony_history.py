@@ -65,7 +65,7 @@ class PatrimonyHistory:
             cash = opening_cash
             contributed = Decimal("0")
             holdings: dict[str, Decimal] = {}
-            invested_cost = Decimal("0")
+            cost_basis: dict[str, Decimal] = {}
 
             for movement in external_cash_movements:
                 if _normalize_datetime(movement.datetime) <= date:
@@ -81,17 +81,42 @@ class PatrimonyHistory:
                     # must not affect consolidated cash or cumulative contributions.
                     pass
 
-            for investment in investments:
-                if _normalize_datetime(investment.datetime) <= date:
+            # Process transactions chronologically so a sale reduces the cost
+            # basis of the shares that were actually held at that point in time.
+            events = [
+                (investment.datetime, 0, investment)
+                for investment in investments
+                if _normalize_datetime(investment.datetime) <= date
+            ]
+            events.extend(
+                (sale.datetime, 1, sale)
+                for sale in sales
+                if _normalize_datetime(sale.datetime) <= date
+            )
+            events.sort(key=lambda event: (_normalize_datetime(event[0]), event[1]))
+
+            for _, event_type, event in events:
+                if event_type == 0:
+                    investment = event
                     cash -= investment.amount
                     holdings[investment.symbol] = holdings.get(investment.symbol, Decimal("0")) + investment.shares
-                    invested_cost += investment.amount
-
-            for sale in sales:
-                if _normalize_datetime(sale.datetime) <= date:
+                    cost_basis[investment.symbol] = cost_basis.get(investment.symbol, Decimal("0")) + investment.amount
+                else:
+                    sale = event
+                    held_shares = holdings.get(sale.symbol, Decimal("0"))
+                    held_cost = cost_basis.get(sale.symbol, Decimal("0"))
+                    if held_shares > 0 and sale.shares <= held_shares:
+                        sale_cost_basis = held_cost * sale.shares / held_shares
+                    else:
+                        # Keep historical reconstruction resilient to incomplete
+                        # legacy data: a sale without a matching position has no
+                        # known acquisition cost to remove.
+                        sale_cost_basis = Decimal("0")
                     cash += sale.amount
-                    holdings[sale.symbol] = holdings.get(sale.symbol, Decimal("0")) - sale.shares
-                    invested_cost -= sale.amount
+                    holdings[sale.symbol] = held_shares - sale.shares
+                    cost_basis[sale.symbol] = held_cost - sale_cost_basis
+
+            invested_cost = sum(cost_basis.values(), Decimal("0"))
 
             market_value = Decimal("0")
             for symbol, shares in holdings.items():
