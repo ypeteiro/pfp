@@ -5,7 +5,7 @@ from pfp.cli import run_reconcile
 from pfp.importers.account_reconciliation_repository import AccountReconciliationRepository
 
 
-MOVEMENTS_FILE = Path("data/imports/trade_republic.csv")
+MOVEMENTS_FILE = Path("tests/fixtures/trade_republic.csv")
 
 
 def test_run_reconcile_persists_history_record(tmp_path):
