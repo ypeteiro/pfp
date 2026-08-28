@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from pfp.domain.asset_catalog import AssetCatalog
 from pfp.domain.portfolio import Portfolio
+from pfp.reporting.patrimony_series import PatrimonyPoint
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,12 +66,14 @@ class PortfolioReport:
     accounts: tuple[AccountReport, ...] = ()
     movements: tuple[MovementReport, ...] = ()
     price_consulted_at: datetime | None = None
+    patrimony_series: tuple[PatrimonyPoint, ...] = ()
 
     @classmethod
     def from_portfolio(
         cls,
         portfolio: Portfolio,
         price_consulted_at: datetime | None = None,
+        patrimony_series: tuple[PatrimonyPoint, ...] = (),
     ) -> "PortfolioReport":
         market_value = sum((position.market_value or Decimal("0") for position in portfolio.positions.values()), Decimal("0"))
         unrealized_gain_loss = sum((position.gain_loss or Decimal("0") for position in portfolio.positions.values()), Decimal("0"))
@@ -120,4 +123,5 @@ class PortfolioReport:
             accounts=accounts,
             movements=movements,
             price_consulted_at=price_consulted_at,
+            patrimony_series=patrimony_series,
         )
