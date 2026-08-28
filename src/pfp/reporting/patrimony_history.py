@@ -8,6 +8,7 @@ from pfp.domain.account_transfer import AccountTransfer
 from pfp.domain.external_cash_movement import ExternalCashMovement
 from pfp.domain.investment import Investment
 from pfp.domain.sale import Sale
+from pfp.engine.portfolio_engine import PortfolioEngine
 from pfp.reporting.historical_prices import HistoricalPriceProvider, MappingHistoricalPriceProvider
 
 
@@ -30,7 +31,7 @@ class PatrimonySnapshot:
 
 
 class PatrimonyHistory:
-    """Reconstructs portfolio state at supplied historical dates."""
+    """Reconstruct portfolio state at the supplied historical dates."""
 
     @classmethod
     def build(
@@ -40,6 +41,7 @@ class PatrimonyHistory:
         opening_cash: Decimal = Decimal("0"),
         external_cash_movements: list[ExternalCashMovement] | tuple[ExternalCashMovement, ...] = (),
         capital_movements: list[ExternalCashMovement] | tuple[ExternalCashMovement, ...] | None = None,
+        movements=(),
         investments: list[Investment] | tuple[Investment, ...] = (),
         sales: list[Sale] | tuple[Sale, ...] = (),
         account_transfers: list[AccountTransfer] | tuple[AccountTransfer, ...] = (),
@@ -58,57 +60,95 @@ class PatrimonyHistory:
             )
             if trade_republic_movements:
                 capital_movements = trade_republic_movements
+
         ordered_dates = sorted({_normalize_datetime(date) for date in dates})
+        ordered_movements = tuple(sorted(movements, key=lambda item: _normalize_datetime(item.datetime)))
+        ordered_investments = tuple(sorted(investments, key=lambda item: _normalize_datetime(item.datetime)))
+        ordered_sales = tuple(sorted(sales, key=lambda item: _normalize_datetime(item.datetime)))
+        ordered_external = tuple(sorted(external_cash_movements, key=lambda item: _normalize_datetime(item.datetime)))
+        ordered_capital = tuple(sorted(capital_movements, key=lambda item: _normalize_datetime(item.datetime)))
         snapshots: list[PatrimonySnapshot] = []
 
         for date in ordered_dates:
-            cash = opening_cash
-            contributed = Decimal("0")
-            holdings: dict[str, Decimal] = {}
-            invested_cost = Decimal("0")
+            applicable_investments = tuple(
+                investment for investment in ordered_investments
+                if _normalize_datetime(investment.datetime) <= date
+            )
+            applicable_sales = tuple(
+                sale for sale in ordered_sales
+                if _normalize_datetime(sale.datetime) <= date
+            )
 
-            for movement in external_cash_movements:
-                if _normalize_datetime(movement.datetime) <= date:
-                    cash += movement.amount
-
-            for movement in capital_movements:
-                if _normalize_datetime(movement.datetime) <= date:
-                    contributed += movement.amount
-
-            for transfer in account_transfers:
-                if _normalize_datetime(transfer.datetime) <= date:
-                    # Internal transfers redistribute existing cash and therefore
-                    # must not affect consolidated cash or cumulative contributions.
-                    pass
-
-            for investment in investments:
-                if _normalize_datetime(investment.datetime) <= date:
+            if ordered_movements:
+                applicable_movements = tuple(
+                    movement for movement in ordered_movements
+                    if _normalize_datetime(movement.datetime) <= date
+                )
+                historical_portfolio = PortfolioEngine().build(
+                    list(applicable_movements),
+                    investments=list(applicable_investments),
+                    sales=list(applicable_sales),
+                )
+                # Trade Republic movements are already represented in the
+                # historical portfolio. Add only external cash movements from
+                # other accounts to avoid counting TR transfers twice.
+                cash = opening_cash + sum(
+                    (
+                        movement.amount
+                        for movement in ordered_external
+                        if movement.account_id != "Trade Republic"
+                        and _normalize_datetime(movement.datetime) <= date
+                    ),
+                    Decimal("0"),
+                ) + historical_portfolio.cash
+                invested_cost = historical_portfolio.invested
+                holdings = historical_portfolio.positions
+            else:
+                cash = opening_cash
+                for movement in ordered_external:
+                    if _normalize_datetime(movement.datetime) <= date:
+                        cash += movement.amount
+                invested_cost = Decimal("0")
+                holdings = {}
+                for investment in applicable_investments:
                     cash -= investment.amount
-                    holdings[investment.symbol] = holdings.get(investment.symbol, Decimal("0")) + investment.shares
                     invested_cost += investment.amount
-
-            for sale in sales:
-                if _normalize_datetime(sale.datetime) <= date:
+                    position = holdings.get(investment.symbol)
+                    if position is None:
+                        holdings[investment.symbol] = investment
+                    else:
+                        holdings[investment.symbol] = investment
+                for sale in applicable_sales:
                     cash += sale.amount
-                    holdings[sale.symbol] = holdings.get(sale.symbol, Decimal("0")) - sale.shares
                     invested_cost -= sale.amount
 
+            cumulative_contributed = Decimal("0")
+            for flow in ordered_capital:
+                if _normalize_datetime(flow.datetime) <= date:
+                    cumulative_contributed += flow.amount
+
             market_value = Decimal("0")
-            for symbol, shares in holdings.items():
-                price = provider.price(symbol, date)
-                if price is not None:
-                    market_value += shares * price
+            if ordered_movements:
+                for symbol, position in holdings.items():
+                    price = provider.price(symbol, date)
+                    if price is not None:
+                        market_value += position.shares * price
+            else:
+                for symbol, investment in holdings.items():
+                    price = provider.price(symbol, date)
+                    if price is not None:
+                        market_value += investment.shares * price
 
             patrimony = cash + market_value
             snapshots.append(
                 PatrimonySnapshot(
-                    date,
-                    cash,
-                    invested_cost,
-                    market_value,
-                    patrimony,
-                    contributed,
-                    patrimony - contributed,
+                    datetime=date,
+                    cash=cash,
+                    invested_cost=invested_cost,
+                    market_value=market_value,
+                    patrimony=patrimony,
+                    cumulative_contributed=cumulative_contributed,
+                    investment_gain=patrimony - cumulative_contributed,
                 )
             )
 
