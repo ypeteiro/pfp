@@ -7,7 +7,7 @@ from pfp.importers.investment_repository import InvestmentRepository
 from pfp.importers.sale_repository import SaleRepository
 
 
-MOVEMENTS_FILE = Path("data/imports/trade_republic.csv")
+MOVEMENTS_FILE = Path("tests/fixtures/trade_republic.csv")
 
 
 def test_load_portfolio_includes_abanca_savings_opening_balance():
