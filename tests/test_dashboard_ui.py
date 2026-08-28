@@ -56,8 +56,8 @@ def test_dashboard_v2_renders_readable_patrimony_evolution_series_and_timeline()
 
     assert "Patrimonio" in html
     assert "Capital aportado" in html
-    assert "Invertido" in html
-    assert 'aria-label="Evolución temporal del patrimonio, capital aportado y dinero invertido"' in html
+    assert "Capital invertido" in html
+    assert 'aria-label="Evolución temporal del patrimonio, capital aportado y capital invertido"' in html
     assert "10/01/26" in html
     assert "10/02/26" in html
     assert "10/03/26" in html
@@ -67,5 +67,5 @@ def test_dashboard_v2_renders_readable_patrimony_evolution_series_and_timeline()
     assert "stroke-dasharray:8 6" in html
     assert "stroke-dasharray:2 5" in html
     assert "Patrimonio · 2.400,00 €" in html
-    assert "Invertido · 1.700,00 €" in html
+    assert "Capital invertido · 1.700,00 €" in html
     assert "Capital aportado · 2.000,00 €" in html
