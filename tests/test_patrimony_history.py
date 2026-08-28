@@ -28,6 +28,18 @@ def test_external_contribution_increases_cash_and_contributed_capital():
     assert snapshots[1].investment_gain == Decimal("0")
 
 
+def test_opening_cash_is_wealth_not_new_contribution():
+    snapshots = PatrimonyHistory.build(
+        [D1, D2],
+        opening_cash_movements=[ExternalCashMovement(D2, "abanca_ahorro", Decimal("30000"))],
+    )
+
+    assert snapshots[0].patrimony == Decimal("0")
+    assert snapshots[1].cash == Decimal("30000")
+    assert snapshots[1].cumulative_contributed == Decimal("0")
+    assert snapshots[1].investment_gain == Decimal("0")
+
+
 def test_investment_purchase_changes_cash_into_market_value_without_changing_patrimony():
     snapshots = PatrimonyHistory.build(
         [D1, D2, D3],
@@ -43,7 +55,7 @@ def test_investment_purchase_changes_cash_into_market_value_without_changing_pat
     assert snapshots[2].market_value == Decimal("1100")
     assert snapshots[2].invested_cost == Decimal("1000")
     assert snapshots[2].patrimony == Decimal("1100")
-    assert snapshots[2].investment_gain == Decimal("1100")
+    assert snapshots[2].investment_gain == Decimal("100")
 
 
 def test_withdrawal_reduces_patrimony_and_contributed_capital():
@@ -85,7 +97,7 @@ def test_sale_reduces_invested_capital_by_cost_basis_not_sale_proceeds():
     assert snapshots[2].patrimony == Decimal("1200")
 
 
-def test_sale_replaces_market_value_with_cash_without_creating_gain():
+def test_sale_realizes_gain_over_cost_basis():
     snapshots = PatrimonyHistory.build(
         [D1, D2, D3],
         opening_cash=Decimal("1000"),
@@ -99,7 +111,7 @@ def test_sale_replaces_market_value_with_cash_without_creating_gain():
     assert snapshots[2].market_value == Decimal("0")
     assert snapshots[2].invested_cost == Decimal("0")
     assert snapshots[2].patrimony == Decimal("1200")
-    assert snapshots[2].investment_gain == Decimal("1200")
+    assert snapshots[2].investment_gain == Decimal("200")
 
 
 def test_complete_history_separates_contributions_from_investment_performance():
