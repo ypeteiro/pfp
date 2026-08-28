@@ -86,7 +86,7 @@ def _evolution_summary(points: tuple[PatrimonyPoint, ...]) -> str:
     series = (
         ("patrimony", "Patrimonio", [point.patrimony for point in points], "#2563eb", 4, ""),
         ("contributed", "Capital aportado", [point.cumulative_contributed for point in points], "#64748b", 3, "stroke-dasharray:8 6"),
-        ("invested", "Invertido", [point.market_value for point in points], "#059669", 3, "stroke-dasharray:2 5"),
+        ("invested", "Capital invertido", [point.invested_cost for point in points], "#059669", 3, "stroke-dasharray:2 5"),
     )
     all_values = [value for _, _, values, _, _, _ in series for value in values]
     minimum = min(Decimal("0"), min(all_values))
@@ -135,12 +135,12 @@ def _evolution_summary(points: tuple[PatrimonyPoint, ...]) -> str:
     for index, point in enumerate(points):
         title = escape(
             f'{point.datetime.strftime("%d/%m/%Y")}: Patrimonio {euro(point.patrimony)} · '
-            f'Aportado {euro(point.cumulative_contributed)} · Invertido {euro(point.market_value)}'
+            f'Aportado {euro(point.cumulative_contributed)} · Capital invertido {euro(point.invested_cost)}'
         )
         for key, _, value, stroke, _, _ in (
             ("patrimony", "Patrimonio", point.patrimony, "#2563eb", 4, ""),
             ("contributed", "Capital aportado", point.cumulative_contributed, "#64748b", 3, ""),
-            ("invested", "Invertido", point.market_value, "#059669", 3, ""),
+            ("invested", "Capital invertido", point.invested_cost, "#059669", 3, ""),
         ):
             points_svg.append(
                 f'<circle cx="{xs[index]:.1f}" cy="{y_for(value):.1f}" r="4" style="fill:white;stroke:{stroke};stroke-width:2"><title>{title}</title></circle>'
@@ -151,7 +151,7 @@ def _evolution_summary(points: tuple[PatrimonyPoint, ...]) -> str:
     end_labels = []
     for key, label, value, stroke in (
         ("patrimony", "Patrimonio", last.patrimony, "#2563eb"),
-        ("invested", "Invertido", last.market_value, "#059669"),
+        ("invested", "Capital invertido", last.invested_cost, "#059669"),
         ("contributed", "Capital aportado", last.cumulative_contributed, "#64748b"),
     ):
         y = y_for(value) + label_offsets[key]
@@ -164,19 +164,19 @@ def _evolution_summary(points: tuple[PatrimonyPoint, ...]) -> str:
         '<div style="display:flex;flex-wrap:wrap;gap:18px;margin:10px 0 16px;font-size:13px">'
         '<span style="color:#2563eb;font-weight:600">━━ Patrimonio</span>'
         '<span style="color:#64748b;font-weight:600">┄┄ Capital aportado</span>'
-        '<span style="color:#059669;font-weight:600">··· Invertido</span>'
+        '<span style="color:#059669;font-weight:600">··· Capital invertido</span>'
         '</div>'
     )
     gain_tone = "positive" if last.investment_gain >= 0 else "negative"
     svg = (
         f'<div class="patrimony-chart-wrap" style="overflow-x:auto">'
-        f'<svg class="patrimony-chart" viewBox="0 0 {width} {height}" role="img" aria-label="Evolución temporal del patrimonio, capital aportado y dinero invertido">'
+        f'<svg class="patrimony-chart" viewBox="0 0 {width} {height}" role="img" aria-label="Evolución temporal del patrimonio, capital aportado y capital invertido">'
         f'{"".join(ticks)}'
         f'<line x1="{left}" y1="{height-bottom}" x2="{width-right}" y2="{height-bottom}" style="stroke:#94a3b8;stroke-width:1" />'
         f'{"".join(date_labels)}{"".join(lines)}{"".join(points_svg)}{"".join(end_labels)}'
         '</svg></div>'
     )
-    return f'<section class="panel patrimony-evolution"><div class="panel-heading"><div><h2>Evolución patrimonial {tooltip("Patrimonio = efectivo + valor de mercado. Capital aportado = aportaciones netas. Invertido = valor de mercado de las posiciones.")}</h2><p class="muted evolution-description">La línea continua es tu patrimonio. La discontinua es lo que has aportado. La punteada es el valor de mercado de tus inversiones.</p></div><span>{len(points)} puntos históricos</span></div>{svg}{legend}<div class="evolution-summary"><div><span>Patrimonio actual</span><strong>{euro(last.patrimony)}</strong></div><div><span>Capital aportado</span><strong>{euro(last.cumulative_contributed)}</strong></div><div><span>Invertido</span><strong>{euro(last.market_value)}</strong></div><div><span>Rendimiento acumulado</span><strong class="{gain_tone}">{euro(last.investment_gain)}</strong></div></div></section>'
+    return f'<section class="panel patrimony-evolution"><div class="panel-heading"><div><h2>Evolución patrimonial {tooltip("Patrimonio = efectivo + valor de mercado. Capital aportado = aportaciones netas. Capital invertido = coste de las posiciones.")}</h2><p class="muted evolution-description">La línea continua es tu patrimonio. La discontinua es lo que has aportado. La punteada es el capital destinado a comprar tus inversiones.</p></div><span>{len(points)} puntos históricos</span></div>{svg}{legend}<div class="evolution-summary"><div><span>Patrimonio actual</span><strong>{euro(last.patrimony)}</strong></div><div><span>Capital aportado</span><strong>{euro(last.cumulative_contributed)}</strong></div><div><span>Capital invertido</span><strong>{euro(last.invested_cost)}</strong></div><div><span>Rendimiento acumulado</span><strong class="{gain_tone}">{euro(last.investment_gain)}</strong></div></div></section>'
 
 
 def metric(label: str, value: Decimal, tone: str = "") -> str:
