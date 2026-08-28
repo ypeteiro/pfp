@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -22,6 +22,9 @@ from pfp.importers.investment_repository import InvestmentRepository
 from pfp.importers.sale_repository import SaleRepository
 from pfp.importers.trade_republic import TradeRepublicImporter
 from pfp.market.price_provider import CompositePriceProvider
+from pfp.market.yahoo_historical import YahooFinanceHistoricalPriceProvider
+from pfp.reporting.patrimony_history import PatrimonyHistory
+from pfp.reporting.patrimony_series import PatrimonySeries
 from pfp.reporting.portfolio_report import PortfolioReport
 from pfp.web.app import WebApp
 
@@ -37,7 +40,38 @@ def _load_assets(asset_repository: AssetRepository) -> None:
         AssetCatalog.register(asset)
 
 
-def build_web_report(movements_file: Path, investments_file: Path | None = None, sales_file: Path | None = None, price_provider=None, assets_file: Path | None = None) -> PortfolioReport:
+def _history_datetime(value: datetime) -> datetime:
+    if value.tzinfo is not None:
+        return value.astimezone(timezone.utc).replace(tzinfo=None)
+    return value
+
+
+def _build_patrimony_series(movements, investments, sales, historical_price_provider):
+    dates = {_history_datetime(movement.datetime) for movement in movements}
+    dates.update(_history_datetime(investment.datetime) for investment in investments)
+    dates.update(_history_datetime(sale.datetime) for sale in sales)
+    if not dates:
+        return ()
+    capital_flows = TradeRepublicImporter.capital_flows_from_movements(list(movements))
+    snapshots = PatrimonyHistory.build(
+        sorted(dates),
+        movements=movements,
+        investments=investments,
+        sales=sales,
+        capital_flows=capital_flows,
+        price_provider=historical_price_provider,
+    )
+    return PatrimonySeries.build(snapshots)
+
+
+def build_web_report(
+    movements_file: Path,
+    investments_file: Path | None = None,
+    sales_file: Path | None = None,
+    price_provider=None,
+    assets_file: Path | None = None,
+    historical_price_provider=None,
+) -> PortfolioReport:
     investments_file = investments_file or Path(DEFAULT_INVESTMENTS_FILE)
     sales_file = sales_file or Path(DEFAULT_SALES_FILE)
     assets_file = assets_file or DEFAULT_ASSETS_FILE
@@ -51,7 +85,14 @@ def build_web_report(movements_file: Path, investments_file: Path | None = None,
     prices = price_provider.get_prices(list(portfolio.positions.keys()))
     price_consulted_at = datetime.now().astimezone()
     portfolio = engine.build(movements, prices, investments=investments, sales=sales)
-    return PortfolioReport.from_portfolio(portfolio, price_consulted_at=price_consulted_at)
+    series = ()
+    if historical_price_provider is not None:
+        series = _build_patrimony_series(movements, investments, sales, historical_price_provider)
+    return PortfolioReport.from_portfolio(
+        portfolio,
+        price_consulted_at=price_consulted_at,
+        patrimony_series=series,
+    )
 
 
 @dataclass(slots=True)
@@ -61,6 +102,7 @@ class WebRuntime:
     investment_repository: InvestmentRepository | None = None
     sale_repository: SaleRepository | None = None
     asset_repository: AssetRepository | None = None
+    historical_price_provider: object | None = None
 
     def register_investment(self, request: RegisterInvestmentRequest):
         if self.investment_repository is None:
@@ -91,10 +133,31 @@ class WebRuntime:
         prices = self.price_provider.get_prices(list(self.portfolio.positions.keys()))
         for symbol, position in self.portfolio.positions.items():
             position.market_price = prices.get(symbol)
-        return PortfolioReport.from_portfolio(self.portfolio, price_consulted_at=datetime.now().astimezone())
+        investments = self.investment_repository.load() if self.investment_repository is not None else ()
+        sales = self.sale_repository.load() if self.sale_repository is not None else ()
+        series = ()
+        if self.historical_price_provider is not None:
+            series = _build_patrimony_series(
+                self.portfolio.movements,
+                investments,
+                sales,
+                self.historical_price_provider,
+            )
+        return PortfolioReport.from_portfolio(
+            self.portfolio,
+            price_consulted_at=datetime.now().astimezone(),
+            patrimony_series=series,
+        )
 
 
-def build_web_runtime(movements_file: Path, investments_file: Path | None = None, sales_file: Path | None = None, price_provider=None, assets_file: Path | None = None) -> WebRuntime:
+def build_web_runtime(
+    movements_file: Path,
+    investments_file: Path | None = None,
+    sales_file: Path | None = None,
+    price_provider=None,
+    assets_file: Path | None = None,
+    historical_price_provider=None,
+) -> WebRuntime:
     investments_file = investments_file or Path(DEFAULT_INVESTMENTS_FILE)
     sales_file = sales_file or Path(DEFAULT_SALES_FILE)
     assets_file = assets_file or DEFAULT_ASSETS_FILE
@@ -104,7 +167,14 @@ def build_web_runtime(movements_file: Path, investments_file: Path | None = None
     investments = InvestmentRepository(investments_file).load()
     sales = SaleRepository(sales_file).load()
     portfolio = PortfolioEngine().build(movements, investments=investments, sales=sales)
-    return WebRuntime(portfolio, price_provider or CompositePriceProvider(), InvestmentRepository(investments_file), SaleRepository(sales_file), asset_repository)
+    return WebRuntime(
+        portfolio,
+        price_provider or CompositePriceProvider(),
+        InvestmentRepository(investments_file),
+        SaleRepository(sales_file),
+        asset_repository,
+        historical_price_provider or YahooFinanceHistoricalPriceProvider(),
+    )
 
 
 def _required(form: dict[str, list[str]], name: str) -> str:
