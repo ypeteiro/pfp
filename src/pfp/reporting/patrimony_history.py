@@ -118,6 +118,10 @@ class PatrimonyHistory:
                 invested_cost = cumulative_invested
 
             cumulative_contributed = Decimal("0")
+            if ordered_movements:
+                # Opening account balances are the initial capital already present
+                # in the consolidated wealth tracked by the dashboard.
+                cumulative_contributed += opening_cash
             for flow in ordered_capital:
                 if _normalize_datetime(flow.datetime) <= date:
                     cumulative_contributed += flow.amount
