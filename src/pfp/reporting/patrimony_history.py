@@ -68,6 +68,7 @@ class PatrimonyHistory:
         ordered_external = tuple(sorted(external_cash_movements, key=lambda item: _normalize_datetime(item.datetime)))
         ordered_capital = tuple(sorted(capital_movements, key=lambda item: _normalize_datetime(item.datetime)))
         snapshots: list[PatrimonySnapshot] = []
+        uses_raw_movements = bool(ordered_movements)
 
         for date in ordered_dates:
             applicable_investments = tuple(
@@ -79,7 +80,7 @@ class PatrimonyHistory:
                 if _normalize_datetime(sale.datetime) <= date
             )
 
-            if ordered_movements:
+            if uses_raw_movements:
                 applicable_movements = tuple(
                     movement for movement in ordered_movements
                     if _normalize_datetime(movement.datetime) <= date
@@ -118,27 +119,19 @@ class PatrimonyHistory:
                 invested_cost = cumulative_invested
 
             cumulative_contributed = Decimal("0")
-            if ordered_movements:
-                # Opening account balances are the initial capital already present
-                # in the consolidated wealth tracked by the dashboard.
-                cumulative_contributed += opening_cash
             for flow in ordered_capital:
                 if _normalize_datetime(flow.datetime) <= date:
                     cumulative_contributed += flow.amount
 
             market_value = Decimal("0")
-            if ordered_movements:
-                for symbol, position in holdings.items():
-                    price = provider.price(symbol, date)
-                    if price is not None:
-                        market_value += position.shares * price
-            else:
-                for symbol, shares in holdings.items():
-                    price = provider.price(symbol, date)
-                    if price is not None:
-                        market_value += shares * price
+            for symbol, position in holdings.items():
+                price = provider.price(symbol, date)
+                if price is not None:
+                    shares = position.shares if hasattr(position, "shares") else position
+                    market_value += shares * price
 
             patrimony = cash + market_value
+            initial_wealth = opening_cash if uses_raw_movements else Decimal("0")
             snapshots.append(
                 PatrimonySnapshot(
                     datetime=date,
@@ -147,7 +140,7 @@ class PatrimonyHistory:
                     market_value=market_value,
                     patrimony=patrimony,
                     cumulative_contributed=cumulative_contributed,
-                    investment_gain=patrimony - cumulative_contributed,
+                    investment_gain=patrimony - initial_wealth - cumulative_contributed,
                 )
             )
 
