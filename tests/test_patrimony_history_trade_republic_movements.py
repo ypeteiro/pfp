@@ -52,3 +52,20 @@ def test_history_uses_trade_republic_buy_movements_for_invested_cost_and_market_
     assert snapshots[1].patrimony == Decimal("1099")
     assert snapshots[1].cumulative_contributed == Decimal("1000")
     assert snapshots[1].investment_gain == Decimal("99")
+
+
+def test_history_treats_opening_cash_as_initial_contributed_capital_when_using_movements():
+    movements = (_movement(D1, "TRANSFER_INSTANT_INBOUND", "1000"),)
+    contributions = (ExternalCashMovement(D1, "Trade Republic", Decimal("1000")),)
+
+    snapshots = PatrimonyHistory.build(
+        [D1],
+        opening_cash=Decimal("5000"),
+        movements=movements,
+        capital_movements=contributions,
+        prices={D1: {}},
+    )
+
+    assert snapshots[0].cash == Decimal("6000")
+    assert snapshots[0].cumulative_contributed == Decimal("6000")
+    assert snapshots[0].investment_gain == Decimal("0")
