@@ -1,7 +1,7 @@
 """Historical portfolio value reconstruction."""
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 from pfp.domain.account_transfer import AccountTransfer
@@ -142,6 +142,21 @@ class PatrimonyHistory:
                     cumulative_contributed=cumulative_contributed,
                     investment_gain=patrimony - initial_wealth - cumulative_contributed,
                 )
+            )
+
+        if uses_raw_movements and snapshots:
+            first = snapshots[0]
+            snapshots.insert(
+                0,
+                PatrimonySnapshot(
+                    datetime=first.datetime - timedelta(days=1),
+                    cash=Decimal("0"),
+                    invested_cost=Decimal("0"),
+                    market_value=Decimal("0"),
+                    patrimony=Decimal("0"),
+                    cumulative_contributed=Decimal("0"),
+                    investment_gain=Decimal("0"),
+                ),
             )
 
         return tuple(snapshots)
