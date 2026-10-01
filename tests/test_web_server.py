@@ -25,3 +25,27 @@ def test_dashboard_html_contains_core_sections():
     assert "Asignación" in html
     assert "Posiciones" in html
     assert "75,00%" in html
+
+
+def test_asset_lookup_payload_marks_found_result(monkeypatch):
+    from pfp.web import server
+
+    monkeypatch.setattr(
+        server,
+        "lookup_yahoo_asset",
+        lambda isin: {"ticker": "BAC", "name": "Bank of America Corporation"},
+    )
+
+    assert server._asset_lookup_payload("US0605051046") == {
+        "found": True,
+        "ticker": "BAC",
+        "name": "Bank of America Corporation",
+    }
+
+
+def test_asset_lookup_payload_marks_missing_result(monkeypatch):
+    from pfp.web import server
+
+    monkeypatch.setattr(server, "lookup_yahoo_asset", lambda isin: None)
+
+    assert server._asset_lookup_payload("UNKNOWN") == {"found": False}
