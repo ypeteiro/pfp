@@ -117,3 +117,44 @@ def test_yahoo_historical_price_provider_skips_non_finite_close_and_uses_previou
     provider = YahooFinanceHistoricalPriceProvider()
 
     assert provider.price("IE00BK5BQT80", WHEN) == Decimal("120.00")
+
+
+def test_yahoo_historical_price_provider_uses_asset_isin_without_manual_mapping(monkeypatch):
+    from pfp.domain.asset import Asset
+    from pfp.domain.asset_catalog import AssetCatalog
+
+    symbol = "TEST-ISIN-HISTORICAL"
+    AssetCatalog._assets.pop(symbol, None)
+    AssetCatalog.register(Asset(symbol, "Example ETF", "EQUITY", isin="IE00HISTISIN"))
+    requested = []
+
+    class Row:
+        def __getitem__(self, key):
+            assert key == "Close"
+            return Decimal("123.456")
+
+    class History:
+        empty = False
+
+        def iterrows(self):
+            return iter(((WHEN, Row()),))
+
+    class Ticker:
+        def history(self, **kwargs):
+            return History()
+
+        @property
+        def fast_info(self):
+            return {"currency": "EUR"}
+
+    def ticker(value):
+        requested.append(value)
+        return Ticker()
+
+    monkeypatch.setattr("pfp.market.yahoo_historical.yf.Ticker", ticker)
+    try:
+        provider = YahooFinanceHistoricalPriceProvider()
+        assert provider.price(symbol, WHEN) == Decimal("123.46")
+        assert requested == ["IE00HISTISIN"]
+    finally:
+        AssetCatalog._assets.pop(symbol, None)
