@@ -166,3 +166,47 @@ def test_yahoo_price_provider_uses_asset_isin_without_manual_mapping(monkeypatch
         assert requested == ["IE00TESTISIN"]
     finally:
         AssetCatalog._assets.pop(symbol, None)
+
+
+def test_lookup_yahoo_asset_does_not_guess_from_unrelated_isin_result(monkeypatch):
+    class Search:
+        def __init__(self, query, max_results):
+            assert query == "IE00TESTISIN"
+            assert max_results == 10
+            self.quotes = [
+                {
+                    "symbol": "$0P00000WLG.F",
+                    "longname": "Unrelated Morningstar result",
+                }
+            ]
+
+    monkeypatch.setattr("pfp.market.yahoo.yf.Search", Search)
+
+    from pfp.market.yahoo import lookup_yahoo_asset
+
+    assert lookup_yahoo_asset("IE00TESTISIN") is None
+
+
+def test_lookup_yahoo_asset_accepts_exact_isin_result(monkeypatch):
+    class Search:
+        def __init__(self, query, max_results):
+            self.quotes = [
+                {
+                    "symbol": "$0P00000WLG.F",
+                    "longname": "Wrong result",
+                },
+                {
+                    "symbol": "VWCE.DE",
+                    "isin": "IE00TESTISIN",
+                    "longname": "Example ETF",
+                },
+            ]
+
+    monkeypatch.setattr("pfp.market.yahoo.yf.Search", Search)
+
+    from pfp.market.yahoo import lookup_yahoo_asset
+
+    assert lookup_yahoo_asset("IE00TESTISIN") == {
+        "ticker": "VWCE.DE",
+        "name": "Example ETF",
+    }
