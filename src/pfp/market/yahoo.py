@@ -27,6 +27,22 @@ YAHOO_SYMBOLS = {
 }
 
 
+def resolve_yahoo_symbol(symbol: str) -> str | None:
+    """Resolve a PFP symbol to a Yahoo Finance symbol."""
+    yahoo_symbol = YAHOO_SYMBOLS.get(symbol)
+    if yahoo_symbol is not None:
+        return yahoo_symbol
+
+    asset = AssetCatalog.get(symbol)
+    if asset is not None:
+        if asset.ticker:
+            return asset.ticker
+        if asset.isin:
+            return asset.isin
+
+    return None
+
+
 YAHOO_CURRENCY_NORMALIZATION = {
     "GBp": "GBP",
 }
@@ -52,11 +68,7 @@ class YahooFinancePriceProvider:
 
         for symbol in symbols:
             try:
-                yahoo_symbol = YAHOO_SYMBOLS.get(symbol)
-                if yahoo_symbol is None:
-                    asset = AssetCatalog.get(symbol)
-                    yahoo_symbol = asset.ticker if asset is not None else None
-
+                yahoo_symbol = resolve_yahoo_symbol(symbol)
                 if not yahoo_symbol:
                     continue
 
