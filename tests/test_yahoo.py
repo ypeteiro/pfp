@@ -83,13 +83,13 @@ def test_yahoo_price_provider_maps_nvidia_isin_to_nvda(monkeypatch):
 
 
 def test_yahoo_price_provider_uses_asset_catalog_ticker(monkeypatch):
-    symbol = "US0605051046"
+    symbol = "TEST-ASSET-TICKER"
+    AssetCatalog._assets.pop(symbol, None)
     AssetCatalog.register(
         Asset(
             symbol=symbol,
             name="Example Stock",
             portfolio_class="STOCK",
-            isin=symbol,
             ticker="BAC",
         )
     )
