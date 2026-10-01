@@ -47,6 +47,15 @@ class RebalanceEngine:
             else TARGET_ALLOCATION.copy()
         )
 
+    @staticmethod
+    def _position_price(position):
+        """Use the market price, falling back to cost basis when no quote exists."""
+        return position.market_price if position.market_price is not None else position.average_price
+
+    @classmethod
+    def _position_market_value(cls, position):
+        return position.shares * cls._position_price(position)
+
     def rebalance(self, portfolio, account_id=DEFAULT_REBALANCE_ACCOUNT_ID):
         class_values = {
             portfolio_class: Decimal("0")
@@ -59,11 +68,7 @@ class RebalanceEngine:
 
         market_value = portfolio.cash
         for position in portfolio.positions.values():
-            if position.market_price is None:
-                raise ValueError(
-                    f"Market price is not available for {position.symbol}"
-                )
-            market_value += position.market_value
+            market_value += self._position_market_value(position)
 
         account_positions = portfolio.account_positions.get(account_id)
         if portfolio.accounts:
@@ -86,14 +91,10 @@ class RebalanceEngine:
             rebalanceable_cash = portfolio.cash
 
         for position in account_positions.values():
-            if position.market_price is None:
-                raise ValueError(
-                    f"Market price is not available for {position.symbol}"
-                )
             portfolio_class = getattr(position, "portfolio_class", None)
             if portfolio_class not in class_values:
                 continue
-            class_values[portfolio_class] += position.market_value
+            class_values[portfolio_class] += self._position_market_value(position)
             positions_by_class[portfolio_class].append(position)
 
         rebalanceable_value = rebalanceable_cash + sum(class_values.values())
@@ -146,7 +147,7 @@ class RebalanceEngine:
                         asset_name=selected_position.name,
                         portfolio_class=portfolio_class,
                         amount=difference_value,
-                        shares=difference_value / selected_position.market_price,
+                        shares=difference_value / self._position_price(selected_position),
                         account_id=account_id,
                     )
                 )
@@ -159,8 +160,8 @@ class RebalanceEngine:
                 ):
                     if remaining <= tolerance:
                         break
-                    amount = min(remaining, position.market_value)
-                    shares = amount / position.market_price
+                    amount = min(remaining, self._position_market_value(position))
+                    shares = amount / self._position_price(position)
                     orders.append(
                         RebalanceOrder(
                             action="SELL",
