@@ -136,7 +136,9 @@ def _evolution_summary(evolution: PatrimonyEvolution, points: tuple[PatrimonyPoi
     end_labels = []
     for key, label, value, stroke in (("patrimony", "Patrimonio", last.patrimony, "#2563eb"), ("invested", "Capital invertido", last.invested_cost, "#059669"), ("contributed", "Capital aportado", last.cumulative_contributed, "#64748b")):
         y = y_for(value) + label_offsets[key]
-        end_labels.append(f'<line x1="{xs[-1]+6:.1f}" y1="{y_for(value):.1f}" x2="{width-right+8}" y2="{y:.1f}" style="stroke:{stroke};stroke-width:1.5" /><text x="{width-right+14}" y="{y+4:.1f}" style="fill:{stroke};font-size:12px;font-weight:600">{escape(label)} · {escape(euro(value))}</text>')
+        label_x = width - right - 6
+        line_x = label_x - 10
+        end_labels.append(f'<line x1="{xs[-1]+6:.1f}" y1="{y_for(value):.1f}" x2="{line_x}" y2="{y:.1f}" style="stroke:{stroke};stroke-width:1.5" /><text x="{label_x}" y="{y+4:.1f}" text-anchor="end" style="fill:{stroke};font-size:12px;font-weight:600">{escape(label)} · {escape(euro(value))}</text>')
 
     legend = '<div style="display:flex;flex-wrap:wrap;gap:18px;margin:10px 0 16px;font-size:13px"><span style="color:#2563eb;font-weight:600">━━ Patrimonio</span><span style="color:#64748b;font-weight:600">┄┄ Capital aportado</span><span style="color:#059669;font-weight:600">··· Capital invertido</span></div>'
     gain_tone = "positive" if last.investment_gain >= 0 else "negative"
