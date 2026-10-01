@@ -21,7 +21,7 @@ def test_yahoo_historical_price_provider_returns_eur_close(monkeypatch):
 
     class Ticker:
         def history(self, **kwargs):
-            assert kwargs["start"] == WHEN.date() - timedelta(days=4)
+            assert kwargs["start"] == WHEN.date() - timedelta(days=30)
             assert kwargs["end"] == WHEN.date() + timedelta(days=1)
             assert kwargs["auto_adjust"] is False
             return History()
@@ -78,3 +78,42 @@ def test_yahoo_historical_price_provider_returns_none_for_unknown_symbol():
     provider = YahooFinanceHistoricalPriceProvider()
 
     assert provider.price("UNKNOWN", WHEN) is None
+
+
+
+def test_yahoo_historical_price_provider_skips_non_finite_close_and_uses_previous_valid_close(monkeypatch):
+    class Row:
+        def __init__(self, close):
+            self.close = close
+
+        def __getitem__(self, key):
+            assert key == "Close"
+            return self.close
+
+    class History:
+        empty = False
+
+        def iterrows(self):
+            return iter(
+                (
+                    (WHEN - timedelta(days=1), Row(Decimal("120"))),
+                    (WHEN, Row(Decimal("NaN"))),
+                )
+            )
+
+    class Ticker:
+        def history(self, **kwargs):
+            assert kwargs["start"] == WHEN.date() - timedelta(days=30)
+            assert kwargs["end"] == WHEN.date() + timedelta(days=1)
+            assert kwargs["auto_adjust"] is False
+            return History()
+
+        @property
+        def fast_info(self):
+            return {"currency": "EUR"}
+
+    monkeypatch.setattr("pfp.market.yahoo_historical.yf.Ticker", lambda _: Ticker())
+
+    provider = YahooFinanceHistoricalPriceProvider()
+
+    assert provider.price("IE00BK5BQT80", WHEN) == Decimal("120.00")
