@@ -54,7 +54,7 @@ class YahooFinancePriceProvider:
                 yahoo_symbol = YAHOO_SYMBOLS.get(symbol)
                 if yahoo_symbol is None:
                     asset = AssetCatalog.get(symbol)
-                    yahoo_symbol = asset.ticker if asset is not None else symbol
+                    yahoo_symbol = asset.ticker if asset is not None else None
 
                 if not yahoo_symbol:
                     continue
