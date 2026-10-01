@@ -2,6 +2,7 @@ from decimal import Decimal
 
 import yfinance as yf
 
+from pfp.domain.asset_catalog import AssetCatalog
 from pfp.market.currency import normalize_price
 from pfp.market.yahoo_currency_rates import (
     YahooCurrencyRateProvider,
@@ -51,8 +52,11 @@ class YahooFinancePriceProvider:
         for symbol in symbols:
             try:
                 yahoo_symbol = YAHOO_SYMBOLS.get(symbol)
-
                 if yahoo_symbol is None:
+                    asset = AssetCatalog.get(symbol)
+                    yahoo_symbol = asset.ticker if asset is not None else symbol
+
+                if not yahoo_symbol:
                     continue
 
                 ticker = yf.Ticker(yahoo_symbol)
