@@ -4,7 +4,7 @@ from decimal import Decimal
 import yfinance as yf
 
 from pfp.market.currency import normalize_price
-from pfp.market.yahoo import YAHOO_CURRENCY_NORMALIZATION, YAHOO_SYMBOLS
+from pfp.market.yahoo import YAHOO_CURRENCY_NORMALIZATION, resolve_yahoo_symbol
 from pfp.market.yahoo_currency_rates import YahooCurrencyRateProvider
 from pfp.reporting.historical_prices import HistoricalPriceProvider
 
@@ -34,7 +34,7 @@ class YahooFinanceHistoricalPriceProvider(HistoricalPriceProvider):
         return None
 
     def price(self, symbol: str, at: datetime) -> Decimal | None:
-        yahoo_symbol = YAHOO_SYMBOLS.get(symbol)
+        yahoo_symbol = resolve_yahoo_symbol(symbol)
         if yahoo_symbol is None:
             return None
 
