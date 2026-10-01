@@ -1,5 +1,4 @@
 from decimal import Decimal
-import re
 
 import yfinance as yf
 
@@ -39,7 +38,9 @@ def resolve_yahoo_symbol(symbol: str) -> str | None:
         if asset.ticker:
             return asset.ticker
         if asset.isin:
-            return asset.isin
+            lookup = lookup_yahoo_asset(asset.isin)
+            if lookup is not None:
+                return lookup["ticker"]
 
     return None
 
