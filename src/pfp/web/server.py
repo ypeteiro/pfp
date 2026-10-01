@@ -333,6 +333,13 @@ def parse_sale_request(form: dict[str, list[str]]) -> RegisterSaleRequest:
     )
 
 
+def _asset_lookup_payload(isin: str) -> dict[str, object]:
+    result = lookup_yahoo_asset(isin)
+    if result is None:
+        return {"found": False}
+    return {"found": True, **result}
+
+
 def parse_asset_request(form: dict[str, list[str]]) -> Asset:
     return Asset(
         symbol=_required(form, "symbol"),
@@ -403,9 +410,8 @@ def serve(
             if path.startswith("/assets/lookup?"):
                 query = parse_qs(path.split("?", 1)[1])
                 isin = query.get("isin", [""])[0].strip()
-                result = lookup_yahoo_asset(isin)
                 body = json.dumps(
-                    result or {"found": False},
+                    _asset_lookup_payload(isin),
                     ensure_ascii=False,
                 ).encode("utf-8")
                 self.send_response(200)
