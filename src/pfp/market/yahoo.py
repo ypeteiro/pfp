@@ -68,11 +68,12 @@ def lookup_yahoo_asset(query: str) -> dict[str, str] | None:
         )
 
         # Yahoo Search may return internal Morningstar identifiers such
-        # as $0P00000WLG.F for an ISIN. Those are not tradable Yahoo
-        # symbols and must never be promoted to an asset ticker.
+        # as 0P00000WLG.F (sometimes prefixed with "$") for mutual funds.
+        # These are not tradable Yahoo symbols and must never be promoted
+        # to an asset ticker.
         quote = exact or quotes[0]
         quote_symbol = str(quote.get("symbol", "")).strip()
-        if quote_symbol.startswith("$0P"):
+        if quote_symbol.lstrip("$").startswith("0P"):
             return None
 
         name = str(
