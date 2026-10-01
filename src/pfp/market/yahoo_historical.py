@@ -22,8 +22,15 @@ class YahooFinanceHistoricalPriceProvider(HistoricalPriceProvider):
 
         for index, row in reversed(list(history.iterrows())):
             index_date = index.date() if hasattr(index, "date") else index
-            if index_date <= target:
-                return row["Close"]
+            if index_date > target:
+                continue
+            close = row["Close"]
+            try:
+                close = Decimal(str(close))
+            except Exception:
+                continue
+            if close.is_finite():
+                return close
         return None
 
     def price(self, symbol: str, at: datetime) -> Decimal | None:
@@ -33,7 +40,7 @@ class YahooFinanceHistoricalPriceProvider(HistoricalPriceProvider):
 
         ticker = yf.Ticker(yahoo_symbol)
         history = ticker.history(
-            start=at.date() - timedelta(days=4),
+            start=at.date() - timedelta(days=30),
             end=at.date() + timedelta(days=1),
             auto_adjust=False,
         )

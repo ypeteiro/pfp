@@ -11,9 +11,15 @@ class AccountOpeningBalanceRepository:
         self.path = Path(path) if path is not None else None
 
     def load(self):
-        if self.path is None or not self.path.exists():
+        if self.path is None:
             return []
-        with self.path.open("r", encoding="utf-8", newline="") as file:
+        path = self.path
+        if not path.exists():
+            fallback = path.with_name("abanca_ahorro_opening_balance.csv")
+            if path.name != "opening_balances.csv" or not fallback.exists():
+                return []
+            path = fallback
+        with path.open("r", encoding="utf-8", newline="") as file:
             reader = csv.DictReader(file)
             return [
                 AccountOpeningBalance(
