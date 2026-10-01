@@ -101,12 +101,15 @@ def test_rebalance_excludes_non_rebalanceable_assets_from_target_allocation():
     assert allocations["GOLD"].target_value == Decimal("950")
 
 
-def test_rebalance_rejects_missing_market_price():
+def test_rebalance_uses_average_price_when_market_price_is_missing():
     portfolio = build_portfolio()
     portfolio.positions["EQUITY"].market_price = None
-    try:
-        RebalanceEngine().rebalance(portfolio)
-    except ValueError as error:
-        assert str(error) == "Market price is not available for EQUITY"
-    else:
-        raise AssertionError("Expected missing market price to be rejected")
+
+    rebalance = RebalanceEngine().rebalance(portfolio)
+
+    assert rebalance.total_value == Decimal("19000")
+    assert rebalance.rebalanceable_value == Decimal("19000")
+    equity_order = next(
+        order for order in rebalance.orders if order.portfolio_class == "EQUITY"
+    )
+    assert equity_order.shares == Decimal("1.875")
