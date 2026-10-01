@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import json
 from decimal import Decimal, InvalidOperation
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -30,6 +31,7 @@ from pfp.importers.investment_repository import InvestmentRepository
 from pfp.importers.sale_repository import SaleRepository
 from pfp.importers.trade_republic import TradeRepublicImporter
 from pfp.market.price_provider import CompositePriceProvider
+from pfp.market.yahoo import lookup_yahoo_asset
 from pfp.market.yahoo_historical import YahooFinanceHistoricalPriceProvider
 from pfp.reporting.patrimony_history import PatrimonyHistory
 from pfp.reporting.portfolio_report import PortfolioReport
@@ -398,6 +400,20 @@ def serve(
         def do_GET(self):
             nonlocal app, runtime, reconciliation_repository
             path = self.path
+            if path.startswith("/assets/lookup?"):
+                query = parse_qs(path.split("?", 1)[1])
+                isin = query.get("isin", [""])[0].strip()
+                result = lookup_yahoo_asset(isin)
+                body = json.dumps(
+                    result or {"found": False},
+                    ensure_ascii=False,
+                ).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
             if path == "/refresh":
                 try:
                     runtime = make_runtime()
