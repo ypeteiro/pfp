@@ -1,3 +1,5 @@
+from pfp.domain.asset import Asset
+from pfp.domain.asset_catalog import AssetCatalog
 from decimal import Decimal
 
 from pfp.market.yahoo import YahooFinancePriceProvider
@@ -78,3 +80,52 @@ def test_yahoo_price_provider_maps_nvidia_isin_to_nvda(monkeypatch):
 
     assert provider.get_prices(["US67066G1040"]) == {"US67066G1040": Decimal("180.00")}
     assert requested == ["NVDA"]
+
+
+def test_yahoo_price_provider_uses_asset_catalog_ticker(monkeypatch):
+    symbol = "US0605051046"
+    AssetCatalog.register(
+        Asset(
+            symbol=symbol,
+            name="Example Stock",
+            portfolio_class="STOCK",
+            isin=symbol,
+            ticker="BAC",
+        )
+    )
+    requested = []
+
+    class CloseSeries:
+        iloc = [Decimal("100")]
+
+    class History:
+        empty = False
+
+        def __getitem__(self, key):
+            assert key == "Close"
+            return CloseSeries()
+
+    class Ticker:
+        def history(self, **kwargs):
+            return History()
+
+        @property
+        def fast_info(self):
+            return {"currency": "USD"}
+
+    def ticker(symbol):
+        requested.append(symbol)
+        return Ticker()
+
+    class CurrencyRateProvider:
+        def get_rate(self, from_currency, to_currency):
+            return Decimal("0.9")
+
+    monkeypatch.setattr("pfp.market.yahoo.yf.Ticker", ticker)
+
+    try:
+        provider = YahooFinancePriceProvider(CurrencyRateProvider())
+        assert provider.get_prices([symbol]) == {symbol: Decimal("90.00")}
+        assert requested == ["BAC"]
+    finally:
+        AssetCatalog._assets.pop(symbol, None)
