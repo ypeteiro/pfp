@@ -137,6 +137,14 @@ def test_yahoo_price_provider_uses_asset_isin_without_manual_mapping(monkeypatch
     AssetCatalog.register(Asset(symbol, "Example ETF", "EQUITY", isin="IE00TESTISIN"))
     requested = []
 
+    class Search:
+        def __init__(self, query, max_results):
+            assert query == "IE00TESTISIN"
+            assert max_results == 10
+            self.quotes = [{"symbol": "VWCE.DE", "isin": "IE00TESTISIN", "longname": "Example ETF"}]
+
+    monkeypatch.setattr("pfp.market.yahoo.yf.Search", Search)
+
     class CloseSeries:
         iloc = [Decimal("100")]
 
@@ -163,7 +171,7 @@ def test_yahoo_price_provider_uses_asset_isin_without_manual_mapping(monkeypatch
     try:
         provider = YahooFinancePriceProvider()
         assert provider.get_prices([symbol]) == {symbol: Decimal("100.00")}
-        assert requested == ["IE00TESTISIN"]
+        assert requested == ["VWCE.DE"]
     finally:
         AssetCatalog._assets.pop(symbol, None)
 
