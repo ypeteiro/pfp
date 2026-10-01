@@ -69,3 +69,22 @@ def test_dashboard_v2_renders_readable_patrimony_evolution_series_and_timeline()
     assert "Patrimonio · 2.400,00 €" in html
     assert "Capital invertido · 1.700,00 €" in html
     assert "Capital aportado · 2.000,00 €" in html
+
+
+def test_dashboard_v2_uses_total_pl_for_accumulated_return():
+    points = (
+        PatrimonyPoint(datetime(2026, 3, 10), Decimal("2400"), Decimal("2000"), Decimal("-1034.44"), Decimal("1700"), Decimal("2400")),
+    )
+    report = PortfolioReport(
+        cash=Decimal("700"), invested=Decimal("1700"), market_value=Decimal("1700"), total_value=Decimal("2400"),
+        realized_gain_loss=Decimal("0"), unrealized_gain_loss=Decimal("177.56"),
+        equity_value=Decimal("1700"), fixed_income_value=Decimal("0"), gold_value=Decimal("0"), crypto_value=Decimal("0"),
+        positions=(), accounts=(), movements=(), patrimony_series=points,
+    )
+
+    html = dashboard_v2_html(report)
+
+    assert "P/L total" in html
+    assert "177,56 €" in html
+    assert "Rendimiento acumulado" in html
+    assert "-1.034,44 €" not in html
