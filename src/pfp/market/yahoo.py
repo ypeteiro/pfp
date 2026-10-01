@@ -80,7 +80,7 @@ def lookup_yahoo_asset(query: str) -> dict[str, str] | None:
             or ""
         ).strip()
 
-        return {"ticker": ticker, "name": name}
+        return {"ticker": quote_symbol, "name": name}
     except Exception:
         return None
 
