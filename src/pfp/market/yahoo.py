@@ -43,6 +43,43 @@ def resolve_yahoo_symbol(symbol: str) -> str | None:
     return None
 
 
+def lookup_yahoo_asset(query: str) -> dict[str, str] | None:
+    """Look up an instrument in Yahoo Finance and return its basic identity."""
+    query = query.strip()
+    if not query:
+        return None
+
+    try:
+        search = yf.Search(query, max_results=10)
+        quotes = getattr(search, "quotes", ()) or ()
+        if not quotes:
+            return None
+
+        exact = next(
+            (
+                quote
+                for quote in quotes
+                if str(quote.get("symbol", "")).upper() == query.upper()
+                or str(quote.get("isin", "")).upper() == query.upper()
+            ),
+            None,
+        )
+        quote = exact or quotes[0]
+        ticker = str(quote.get("symbol", "")).strip()
+        if not ticker:
+            return None
+
+        name = str(
+            quote.get("longname")
+            or quote.get("shortname")
+            or ""
+        ).strip()
+
+        return {"ticker": ticker, "name": name}
+    except Exception:
+        return None
+
+
 YAHOO_CURRENCY_NORMALIZATION = {
     "GBp": "GBP",
 }
