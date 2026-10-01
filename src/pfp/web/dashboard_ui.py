@@ -43,7 +43,7 @@ def dashboard_v2_html(report: PortfolioReport, sort: str = "weight", direction: 
     positions = sort_positions(report, sort, direction)
     position_rows = "".join(f'<tr><td>{escape(p.ticker or p.isin or p.symbol)}</td><td>{escape(p.name)}</td><td>{pct(p.weight)}</td><td>{euro(p.market_value)}</td><td class="{"positive" if p.gain_loss is not None and p.gain_loss > 0 else "negative" if p.gain_loss is not None and p.gain_loss < 0 else ""}">{euro(p.gain_loss)}</td></tr>' for p in positions[:10])
     total_pl = report.realized_gain_loss + report.unrealized_gain_loss
-    evolution_html = _evolution_summary(_evolution_from_report(report), report.patrimony_series)
+    evolution_html = _evolution_summary(_evolution_from_report(report), report.patrimony_series, total_pl)
     consulted_at = report.price_consulted_at or datetime.now().astimezone()
     consulted = consulted_at.strftime("%d/%m/%Y %H:%M")
     price_status = f'<p class="price-status">Precios de mercado consultados: {consulted}</p>'
@@ -80,7 +80,7 @@ def _evolution_from_report(report: PortfolioReport) -> PatrimonyEvolution:
     )
 
 
-def _evolution_summary(evolution: PatrimonyEvolution, points: tuple[PatrimonyPoint, ...]) -> str:
+def _evolution_summary(evolution: PatrimonyEvolution, points: tuple[PatrimonyPoint, ...], total_pl: Decimal) -> str:
     if not points:
         return '<section class="panel patrimony-evolution"><div class="panel-heading"><h2>Evolución patrimonial</h2></div><p class="muted">Todavía no hay suficientes datos históricos para mostrar la evolución.</p></section>'
 
@@ -141,9 +141,9 @@ def _evolution_summary(evolution: PatrimonyEvolution, points: tuple[PatrimonyPoi
         end_labels.append(f'<line x1="{xs[-1]+6:.1f}" y1="{y_for(value):.1f}" x2="{line_x}" y2="{y:.1f}" style="stroke:{stroke};stroke-width:1.5" /><text x="{label_x}" y="{y+4:.1f}" text-anchor="end" style="fill:{stroke};font-size:12px;font-weight:600">{escape(label)} · {escape(euro(value))}</text>')
 
     legend = '<div style="display:flex;flex-wrap:wrap;gap:18px;margin:10px 0 16px;font-size:13px"><span style="color:#2563eb;font-weight:600">━━ Patrimonio</span><span style="color:#64748b;font-weight:600">┄┄ Capital aportado</span><span style="color:#059669;font-weight:600">··· Capital invertido</span></div>'
-    gain_tone = "positive" if last.investment_gain >= 0 else "negative"
+    gain_tone = "positive" if total_pl >= 0 else "negative"
     svg = f'<div class="patrimony-chart-wrap" style="overflow-x:auto"><svg class="patrimony-chart" viewBox="0 0 {width} {height}" role="img" aria-label="Evolución temporal del patrimonio, capital aportado y capital invertido">{"".join(ticks)}<line x1="{left}" y1="{height-bottom}" x2="{width-right}" y2="{height-bottom}" style="stroke:#94a3b8;stroke-width:1" />{"".join(date_labels)}{"".join(lines)}{"".join(points_svg)}{"".join(end_labels)}</svg></div>'
-    return f'<section class="panel patrimony-evolution"><div class="panel-heading"><div><h2>Evolución patrimonial {tooltip("Patrimonio = efectivo + valor de mercado. Capital aportado = aportaciones netas. Capital invertido = coste de las posiciones.")}</h2><p class="muted evolution-description">La línea continua es tu patrimonio. La discontinua es lo que has aportado. La punteada es el capital destinado a comprar tus inversiones.</p></div><span>{len(points)} puntos históricos</span></div>{svg}{legend}<div class="evolution-summary"><div><span>Patrimonio actual</span><strong>{euro(last.patrimony)}</strong></div><div><span>Capital aportado</span><strong>{euro(last.cumulative_contributed)}</strong></div><div><span>Capital invertido</span><strong>{euro(last.invested_cost)}</strong></div><div><span>Rendimiento acumulado</span><strong class="{gain_tone}">{euro(last.investment_gain)}</strong></div></div></section>'
+    return f'<section class="panel patrimony-evolution"><div class="panel-heading"><div><h2>Evolución patrimonial {tooltip("Patrimonio = efectivo + valor de mercado. Capital aportado = aportaciones netas. Capital invertido = coste de las posiciones.")}</h2><p class="muted evolution-description">La línea continua es tu patrimonio. La discontinua es lo que has aportado. La punteada es el capital destinado a comprar tus inversiones.</p></div><span>{len(points)} puntos históricos</span></div>{svg}{legend}<div class="evolution-summary"><div><span>Patrimonio actual</span><strong>{euro(last.patrimony)}</strong></div><div><span>Capital aportado</span><strong>{euro(last.cumulative_contributed)}</strong></div><div><span>Capital invertido</span><strong>{euro(last.invested_cost)}</strong></div><div><span>Rendimiento acumulado</span><strong class="{gain_tone}">{euro(total_pl)}</strong></div></div></section>'
 
 
 def metric(label: str, value: Decimal, tone: str = "") -> str:
