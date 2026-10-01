@@ -1,4 +1,5 @@
 from decimal import Decimal
+import re
 
 import yfinance as yf
 
@@ -64,7 +65,17 @@ def lookup_yahoo_asset(query: str) -> dict[str, str] | None:
             ),
             None,
         )
-        quote = exact or quotes[0]
+
+        # Yahoo Search may return internal Morningstar fund identifiers such
+        # as $0P00000WLG.F for an ISIN. Never treat an unrelated search
+        # result as the instrument the user asked for.
+        is_isin = bool(re.fullmatch(r"[A-Za-z]{2}[A-Za-z0-9]{9}[0-9]", query))
+        if is_isin:
+            if exact is None:
+                return None
+            quote = exact
+        else:
+            quote = exact or quotes[0]
         ticker = str(quote.get("symbol", "")).strip()
         if not ticker:
             return None
