@@ -18,14 +18,57 @@ def assets_html(assets) -> str:
 def asset_form_html(error: str | None = None, values: dict[str, str] | None = None) -> str:
     values = values or {}
     error_html = f'<div class="form-error" role="alert">{escape(error)}</div>' if error else ""
-    return f'''<h1>Nuevo activo</h1><p class="muted">Añade un instrumento sin modificar el código de PFP.</p><section class="panel investment-form-panel">{error_html}<form class="investment-form" method="post" action="/assets">
+    return f'''<h1>Nuevo activo</h1><p class="muted">Introduce el ISIN y PFP intentará completar automáticamente el nombre y ticker desde Yahoo Finance.</p><section class="panel investment-form-panel">{error_html}<form class="investment-form" method="post" action="/assets">
 <label>Símbolo<input required type="text" name="symbol" value="{value(values, "symbol")}" placeholder="US1234567890"></label>
-<label>Nombre<input required type="text" name="name" value="{value(values, "name")}"></label>
-<label>Ticker <span class="muted">(opcional)</span><input type="text" name="ticker" value="{value(values, "ticker")}"></label>
-<label>ISIN <span class="muted">(opcional)</span><input type="text" name="isin" value="{value(values, "isin")}"></label>
+<label>Nombre<input required type="text" name="name" value="{value(values, "name")}" placeholder="Se completa automáticamente desde Yahoo"></label>
+<label>Ticker <span class="muted">(opcional)</span><input type="text" name="ticker" value="{value(values, "ticker")}" placeholder="Se completa automáticamente desde Yahoo"></label>
+<label>ISIN <span class="muted">(opcional)</span><input type="text" name="isin" value="{value(values, "isin")}" placeholder="IE00... o US..."></label>
 <label>Clase de cartera<select required name="portfolio_class">{portfolio_class_options(values.get("portfolio_class", "STOCK"))}</select></label>
 <div class="form-actions"><button type="submit">Guardar activo</button><a class="filter-reset" href="/assets">Cancelar</a></div>
-</form></section>'''
+</form>
+<p id="asset-lookup-status" class="muted" aria-live="polite"></p>
+</section>
+<script>
+(function () {{
+  const form = document.querySelector('form[action="/assets"]');
+  if (!form) return;
+
+  const isin = form.querySelector('[name="isin"]');
+  const symbol = form.querySelector('[name="symbol"]');
+  const name = form.querySelector('[name="name"]');
+  const ticker = form.querySelector('[name="ticker"]');
+  const status = document.getElementById("asset-lookup-status");
+  let lookupTimer;
+
+  function lookup() {{
+    const value = isin.value.trim();
+    if (!value) return;
+
+    clearTimeout(lookupTimer);
+    lookupTimer = setTimeout(async function () {{
+      status.textContent = "Buscando instrumento…";
+      try {{
+        const response = await fetch("/assets/lookup?isin=" + encodeURIComponent(value));
+        const result = await response.json();
+        if (!response.ok || !result.found) {{
+          status.textContent = "No se ha encontrado automáticamente. Puedes completar los datos manualmente.";
+          return;
+        }}
+
+        if (!name.value.trim() && result.name) name.value = result.name;
+        if (!ticker.value.trim() && result.ticker) ticker.value = result.ticker;
+        if (!symbol.value.trim()) symbol.value = value;
+        status.textContent = "Datos encontrados en Yahoo Finance.";
+      }} catch (error) {{
+        status.textContent = "No se ha podido consultar Yahoo Finance. Puedes completar los datos manualmente.";
+      }}
+    }}, 300);
+  }}
+
+  isin.addEventListener("blur", lookup);
+  isin.addEventListener("change", lookup);
+}})();
+</script>'''
 
 
 def value(values: dict[str, str], key: str) -> str:
