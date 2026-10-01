@@ -129,3 +129,40 @@ def test_yahoo_price_provider_uses_asset_catalog_ticker(monkeypatch):
         assert requested == ["BAC"]
     finally:
         AssetCatalog._assets.pop(symbol, None)
+
+
+def test_yahoo_price_provider_uses_asset_isin_without_manual_mapping(monkeypatch):
+    symbol = "TEST-ISIN-ASSET"
+    AssetCatalog._assets.pop(symbol, None)
+    AssetCatalog.register(Asset(symbol, "Example ETF", "EQUITY", isin="IE00TESTISIN"))
+    requested = []
+
+    class CloseSeries:
+        iloc = [Decimal("100")]
+
+    class History:
+        empty = False
+
+        def __getitem__(self, key):
+            assert key == "Close"
+            return CloseSeries()
+
+    class Ticker:
+        def history(self, **kwargs):
+            return History()
+
+        @property
+        def fast_info(self):
+            return {"currency": "EUR"}
+
+    def ticker(value):
+        requested.append(value)
+        return Ticker()
+
+    monkeypatch.setattr("pfp.market.yahoo.yf.Ticker", ticker)
+    try:
+        provider = YahooFinancePriceProvider()
+        assert provider.get_prices([symbol]) == {symbol: Decimal("100.00")}
+        assert requested == ["IE00TESTISIN"]
+    finally:
+        AssetCatalog._assets.pop(symbol, None)
