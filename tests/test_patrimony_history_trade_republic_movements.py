@@ -73,3 +73,21 @@ def test_history_separates_opening_wealth_from_contributed_capital_when_using_mo
     assert snapshots[1].cash == Decimal("6000")
     assert snapshots[1].cumulative_contributed == Decimal("1000")
     assert snapshots[1].investment_gain == Decimal("0")
+
+
+def test_history_ignores_non_finite_historical_prices():
+    movements = (
+        _movement(D1, "TRANSFER_INSTANT_INBOUND", "1000"),
+        _movement(D2, "BUY", "600", shares="10", price="60"),
+    )
+    contributions = (ExternalCashMovement(D1, "Trade Republic", Decimal("1000")),)
+
+    snapshots = PatrimonyHistory.build(
+        [D1, D2],
+        movements=movements,
+        capital_movements=contributions,
+        prices={D1: {}, D2: {"VWCE": Decimal("NaN")}},
+    )
+
+    assert snapshots[-1].market_value == Decimal("0")
+    assert snapshots[-1].patrimony == Decimal("399")
