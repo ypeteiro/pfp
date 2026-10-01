@@ -195,6 +195,24 @@ def test_lookup_yahoo_asset_does_not_guess_from_unrelated_isin_result(monkeypatc
     assert lookup_yahoo_asset("IE00TESTISIN") is None
 
 
+def test_lookup_yahoo_asset_rejects_morningstar_identifier_without_dollar(monkeypatch):
+    class Search:
+        def __init__(self, query, max_results):
+            self.quotes = [
+                {
+                    "symbol": "0P00000WLG.F",
+                    "quoteType": "MUTUALFUND",
+                    "longname": "Vanguard Glb Stk Idx € Acc",
+                }
+            ]
+
+    monkeypatch.setattr("pfp.market.yahoo.yf.Search", Search)
+
+    from pfp.market.yahoo import lookup_yahoo_asset
+
+    assert lookup_yahoo_asset("IE00B03HD191") is None
+
+
 def test_lookup_yahoo_asset_accepts_exact_isin_result(monkeypatch):
     class Search:
         def __init__(self, query, max_results):
