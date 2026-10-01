@@ -132,7 +132,7 @@ def _evolution_summary(evolution: PatrimonyEvolution, points: tuple[PatrimonyPoi
             points_svg.append(f'<circle cx="{xs[index]:.1f}" cy="{y_for(value):.1f}" r="4" style="fill:white;stroke:{stroke};stroke-width:2"><title>{title}</title></circle>')
 
     last = points[-1]
-    label_offsets = {"patrimony": -18, "invested": 0, "contributed": 18}
+    label_offsets = {"patrimony": -18, "invested": 18, "contributed": -10}
     end_labels = []
     for key, label, value, stroke in (("patrimony", "Patrimonio", last.patrimony, "#2563eb"), ("invested", "Capital invertido", last.invested_cost, "#059669"), ("contributed", "Capital aportado", last.cumulative_contributed, "#64748b")):
         y = y_for(value) + label_offsets[key]
