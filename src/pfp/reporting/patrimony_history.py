@@ -126,7 +126,7 @@ class PatrimonyHistory:
             market_value = Decimal("0")
             for symbol, position in holdings.items():
                 price = provider.price(symbol, date)
-                if price is not None:
+                if price is not None and price.is_finite():
                     shares = position.shares if hasattr(position, "shares") else position
                     market_value += shares * price
 
