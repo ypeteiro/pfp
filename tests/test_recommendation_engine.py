@@ -2,9 +2,14 @@ from decimal import Decimal
 
 from pfp.domain.portfolio import Portfolio
 from pfp.domain.position import Position
-from pfp.engine.recommendation_engine import (
-    RecommendationEngine,
-)
+from pfp.engine.recommendation_engine import RecommendationEngine
+
+
+TEST_TARGET_ALLOCATION = {
+    "EQUITY": Decimal("75"),
+    "FIXED_INCOME": Decimal("20"),
+    "GOLD": Decimal("5"),
+}
 
 
 def build_portfolio():
@@ -37,34 +42,28 @@ def build_portfolio():
     return portfolio
 
 
+def engine():
+    return RecommendationEngine(TEST_TARGET_ALLOCATION)
+
+
 def test_recommendation_total_matches_contribution():
     portfolio = build_portfolio()
 
-    recommendation = RecommendationEngine().recommend(
+    recommendation = engine().recommend(
         portfolio,
         Decimal("800"),
     )
 
-    total = sum(
-        order.amount
-        for order in recommendation.orders
-    )
-
+    total = sum(order.amount for order in recommendation.orders)
     assert total == Decimal("800")
 
 
 def test_recommendation_creates_orders_for_target_classes():
     portfolio = build_portfolio()
 
-    recommendation = RecommendationEngine().recommend(
-        portfolio,
-        Decimal("800"),
-    )
+    recommendation = engine().recommend(portfolio, Decimal("800"))
 
-    assert {
-        order.portfolio_class
-        for order in recommendation.orders
-    } == {
+    assert {order.portfolio_class for order in recommendation.orders} == {
         "EQUITY",
         "FIXED_INCOME",
         "GOLD",
@@ -74,17 +73,9 @@ def test_recommendation_creates_orders_for_target_classes():
 def test_recommendation_uses_existing_asset_for_each_order():
     portfolio = build_portfolio()
 
-    recommendation = RecommendationEngine().recommend(
-        portfolio,
-        Decimal("800"),
-    )
+    recommendation = engine().recommend(portfolio, Decimal("800"))
 
-    symbols = {
-        order.symbol
-        for order in recommendation.orders
-    }
-
-    assert symbols == {
+    assert {order.symbol for order in recommendation.orders} == {
         "EQUITY",
         "BOND",
         "GOLD",
@@ -94,34 +85,19 @@ def test_recommendation_uses_existing_asset_for_each_order():
 def test_recommendation_does_not_create_zero_amount_orders():
     portfolio = build_portfolio()
 
-    recommendation = RecommendationEngine().recommend(
-        portfolio,
-        Decimal("800"),
-    )
+    recommendation = engine().recommend(portfolio, Decimal("800"))
 
-    assert all(
-        order.amount > 0
-        for order in recommendation.orders
-    )
+    assert all(order.amount > 0 for order in recommendation.orders)
 
 
 def test_recommendation_rejects_non_positive_amount():
     portfolio = build_portfolio()
+    engine = RecommendationEngine(TEST_TARGET_ALLOCATION)
 
-    engine = RecommendationEngine()
-
-    for amount in (
-        Decimal("0"),
-        Decimal("-1"),
-    ):
+    for amount in (Decimal("0"), Decimal("-1")):
         try:
-            engine.recommend(
-                portfolio,
-                amount,
-            )
+            engine.recommend(portfolio, amount)
         except ValueError:
             pass
         else:
-            raise AssertionError(
-                "Expected ValueError"
-            )
+            raise AssertionError("Expected ValueError")
