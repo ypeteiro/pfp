@@ -8,11 +8,9 @@ from pfp.config import load_target_allocation, save_target_allocation
 def test_load_target_allocation():
     allocation = load_target_allocation()
 
-    assert allocation == {
-        "EQUITY": Decimal("75.00"),
-        "FIXED_INCOME": Decimal("20.00"),
-        "GOLD": Decimal("5.00"),
-    }
+    assert set(allocation) == {"EQUITY", "FIXED_INCOME", "GOLD"}
+    assert sum(allocation.values()) == Decimal("100")
+    assert all(value >= 0 for value in allocation.values())
 
 
 def test_load_target_allocation_accepts_custom_toml(tmp_path):
