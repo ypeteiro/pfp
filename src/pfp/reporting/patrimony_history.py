@@ -79,26 +79,34 @@ class PatrimonyHistory:
             }
             prefetch(symbols, ordered_dates)
 
-        for date in ordered_dates:
-            applicable_investments = tuple(
-                investment for investment in ordered_investments
-                if _normalize_datetime(investment.datetime) <= date
-            )
-            applicable_sales = tuple(
-                sale for sale in ordered_sales
-                if _normalize_datetime(sale.datetime) <= date
-            )
+        # The old implementation rebuilt the whole portfolio from scratch for
+        # every date. With a long transaction history that became the dominant
+        # cost. Replay the ordered events once and only advance cursors as dates
+        # move forward.
+        engine = PortfolioEngine()
+        historical_portfolio = engine.initialize_incremental(ordered_movements) if uses_raw_movements else None
+        movement_index = investment_index = sales_index = 0
 
+        for date in ordered_dates:
             if uses_raw_movements:
-                applicable_movements = tuple(
-                    movement for movement in ordered_movements
-                    if _normalize_datetime(movement.datetime) <= date
+                while movement_index < len(ordered_movements) and _normalize_datetime(ordered_movements[movement_index].datetime) <= date:
+                    engine.apply_movement(historical_portfolio, ordered_movements[movement_index])
+                    movement_index += 1
+
+                while investment_index < len(ordered_investments) and _normalize_datetime(ordered_investments[investment_index].datetime) <= date:
+                    engine.apply_investment(historical_portfolio, ordered_investments[investment_index])
+                    investment_index += 1
+
+                while sales_index < len(ordered_sales) and _normalize_datetime(ordered_sales[sales_index].datetime) <= date:
+                    engine.apply_sale(historical_portfolio, ordered_sales[sales_index])
+                    sales_index += 1
+
+                historical_portfolio.invested = sum(
+                    position.invested for position in historical_portfolio.positions.values()
                 )
-                historical_portfolio = PortfolioEngine().build(
-                    list(applicable_movements),
-                    investments=list(applicable_investments),
-                    sales=list(applicable_sales),
-                )
+                for position in historical_portfolio.positions.values():
+                    position.validate()
+
                 cash = opening_cash + sum(
                     (
                         movement.amount
@@ -107,24 +115,28 @@ class PatrimonyHistory:
                         and _normalize_datetime(movement.datetime) <= date
                     ),
                     Decimal("0"),
-                ) + historical_portfolio.cash
+                ) + sum((account.balance for account in historical_portfolio.accounts), Decimal("0"))
                 invested_cost = historical_portfolio.invested
                 holdings = historical_portfolio.positions
             else:
                 cash = opening_cash
                 cumulative_invested = Decimal("0")
                 holdings: dict[str, Decimal] = {}
-                for movement in ordered_external:
-                    if _normalize_datetime(movement.datetime) <= date:
-                        cash += movement.amount
-                for investment in applicable_investments:
+                while investment_index < len(ordered_investments) and _normalize_datetime(ordered_investments[investment_index].datetime) <= date:
+                    investment = ordered_investments[investment_index]
                     cash -= investment.amount
                     holdings[investment.symbol] = holdings.get(investment.symbol, Decimal("0")) + investment.shares
                     cumulative_invested += investment.amount
-                for sale in applicable_sales:
+                    investment_index += 1
+                while sales_index < len(ordered_sales) and _normalize_datetime(ordered_sales[sales_index].datetime) <= date:
+                    sale = ordered_sales[sales_index]
                     cash += sale.amount
                     holdings[sale.symbol] = holdings.get(sale.symbol, Decimal("0")) - sale.shares
                     cumulative_invested -= sale.amount
+                    sales_index += 1
+                for movement in ordered_external:
+                    if _normalize_datetime(movement.datetime) <= date:
+                        cash += movement.amount
                 invested_cost = cumulative_invested
 
             cumulative_contributed = Decimal("0")
