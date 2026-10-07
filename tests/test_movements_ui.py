@@ -16,5 +16,5 @@ def test_movements_view_shows_operation_details_and_totals():
         ),
     )
     html = movements_html(report)
-    for text in ("Movimientos", "Compras", "Ventas", "Comisiones", "Impuestos", "TRADE", "BUY", "SELL", "Compra ETF", "1.000,00 €", "550,00 €", "3,00 €", "Flujo neto de efectivo", "-453,00 €"):
+    for text in ("Movimientos", "Compras", "Ventas", "Comisiones", "Impuestos", "TRADE", "BUY", "SELL", "Compra ETF", "1.000,00 €", "550,00 €", "3,00 €", "Flujo neto de efectivo", "-453,00 €", "Importe bruto de las compras", "Importe bruto de las ventas", "Coste total de las comisiones", "Coste total de los impuestos", "Suma de importe, comisión e impuesto"):
         assert text in html
