@@ -2,7 +2,7 @@ from decimal import Decimal
 
 import pytest
 
-from pfp.config import load_target_allocation
+from pfp.config import load_target_allocation, save_target_allocation
 
 
 def test_load_target_allocation():
@@ -57,3 +57,31 @@ def test_load_target_allocation_rejects_negative_target(tmp_path):
 
     with pytest.raises(ValueError, match="cannot contain negative"):
         load_target_allocation(path)
+
+
+def test_save_target_allocation_round_trips(tmp_path):
+    path = tmp_path / "portfolio.toml"
+    save_target_allocation(
+        {
+            "EQUITY": Decimal("70"),
+            "FIXED_INCOME": Decimal("25"),
+            "GOLD": Decimal("5"),
+            "CRYPTO": Decimal("0"),
+        },
+        path,
+    )
+
+    assert load_target_allocation(path) == {
+        "EQUITY": Decimal("70"),
+        "FIXED_INCOME": Decimal("25"),
+        "GOLD": Decimal("5"),
+        "CRYPTO": Decimal("0"),
+    }
+
+
+def test_save_target_allocation_requires_100_percent(tmp_path):
+    with pytest.raises(ValueError, match="sumar 100"):
+        save_target_allocation(
+            {"EQUITY": Decimal("70"), "FIXED_INCOME": Decimal("20")},
+            tmp_path / "portfolio.toml",
+        )
