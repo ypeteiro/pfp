@@ -23,6 +23,8 @@ def test_dashboard_v2_shows_strategy_and_main_metrics(monkeypatch):
     assert "Aumentar" in html
     assert "1.200,00 €" in html
     assert "30,00 €" in html
+    assert "Efectivo" in html
+    assert "Efectivo invertible" in html
 
 
 def test_dashboard_v2_colors_position_pnl_by_sign():
@@ -97,6 +99,11 @@ def test_dashboard_v2_uses_total_pl_and_accumulated_return_for_accumulated_retur
     assert "P/L total" in html
     assert "177,56 €" in html
     assert "Rendimiento acumulado" in html
-    assert "177,56 € · 8,88%" in html
-    assert '<strong class="positive">177,56 € · 8,88%</strong>' in html
+    assert "177,56 € · 8,88%" not in html
+    assert '<strong class="positive">177,56 €</strong>' in html
+    assert '<strong class="positive">8,88%</strong>' in html
     assert "-1.034,44 €" not in html
+    evolution = html.split('<div class="evolution-summary">', 1)[1].split("</div></section>", 1)[0]
+    assert "Efectivo invertible" not in evolution
+    assert "P/L total" in evolution
+    assert "Rendimiento acumulado" in evolution
