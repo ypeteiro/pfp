@@ -9,7 +9,7 @@ from pfp.reporting.patrimony_evolution import PatrimonyEvolution
 def patrimony_evolution_html(evolution: PatrimonyEvolution) -> str:
     points = evolution.points
     if not points:
-        return '<section class="panel"><h2>Evolución patrimonial</h2><p class="muted">Sin datos históricos suficientes.</p></section>'
+        return '<section class="panel"><h2>Evolución del capital aportado</h2><p class="muted">Sin datos históricos suficientes.</p></section>'
     maximum = max((p.cumulative_contributed for p in points), default=Decimal("0"))
     rows = "".join(
         f'<tr><td>{p.datetime.strftime("%d/%m/%Y")}</td><td>{euro(p.cumulative_contributed)}</td><td>{euro(p.contribution)}</td><td>{euro(p.withdrawal)}</td><td>{euro(p.net_flow)}</td></tr>'
