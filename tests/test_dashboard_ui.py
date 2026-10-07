@@ -96,7 +96,7 @@ def test_dashboard_v2_uses_total_pl_and_accumulated_return_for_accumulated_retur
 
     assert "P/L total" in html
     assert "177,56 €" in html
-    assert "Rentabilidad acumulada" in html
+    assert "Rendimiento acumulado" in html
     assert "177,56 € · 8,88%" in html
     assert '<strong class="positive">177,56 € · 8,88%</strong>' in html
     assert "-1.034,44 €" not in html
