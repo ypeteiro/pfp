@@ -18,6 +18,55 @@ def _normalize_datetime(value: datetime) -> datetime:
     return value.astimezone(timezone.utc).replace(tzinfo=None)
 
 
+def _xirr(
+    cash_flows: list[tuple[datetime, Decimal]],
+    *,
+    guess: Decimal = Decimal("0.10"),
+) -> Decimal | None:
+    """Return annualized money-weighted return for dated cash flows."""
+    if len(cash_flows) < 2:
+        return None
+    normalized = [(_normalize_datetime(date), amount) for date, amount in cash_flows]
+    if not any(amount < 0 for _, amount in normalized) or not any(amount > 0 for _, amount in normalized):
+        return None
+
+    base_date = normalized[0][0]
+
+    def npv(rate: Decimal) -> Decimal:
+        if rate <= Decimal("-1"):
+            return Decimal("Infinity")
+        total = Decimal("0")
+        for date, amount in normalized:
+            years = Decimal(str((date - base_date).total_seconds())) / Decimal(str(365.25 * 24 * 60 * 60))
+            total += amount / (Decimal("1") + rate) ** years
+        return total
+
+    low = Decimal("-0.9999")
+    high = Decimal("1")
+    value_low = npv(low)
+    value_high = npv(high)
+    for _ in range(32):
+        if value_low * value_high <= 0:
+            break
+        high *= Decimal("2")
+        value_high = npv(high)
+        if high > Decimal("1000000"):
+            return None
+    else:
+        return None
+
+    for _ in range(100):
+        mid = (low + high) / Decimal("2")
+        value_mid = npv(mid)
+        if abs(value_mid) < Decimal("0.0000000001"):
+            return mid
+        if value_low * value_mid <= 0:
+            high, value_high = mid, value_mid
+        else:
+            low, value_low = mid, value_mid
+    return (low + high) / Decimal("2")
+
+
 @dataclass(frozen=True, slots=True)
 class PatrimonySnapshot:
     datetime: datetime
@@ -27,6 +76,7 @@ class PatrimonySnapshot:
     patrimony: Decimal
     cumulative_contributed: Decimal
     investment_gain: Decimal
+    money_weighted_return: Decimal | None = None
 
 
 class PatrimonyHistory:
@@ -139,6 +189,16 @@ class PatrimonyHistory:
                     market_value += shares * price
 
             patrimony = cash + market_value
+            investment_gain = (
+                patrimony - opening_cash - cumulative_contributed
+                if uses_raw_movements
+                else patrimony - cumulative_contributed
+            )
+            cash_flows = [(flow.datetime, -flow.amount) for flow in ordered_capital if _normalize_datetime(flow.datetime) <= date]
+            if opening_cash:
+                cash_flows.insert(0, (date if not cash_flows else cash_flows[0][0], -opening_cash))
+            cash_flows.append((date, patrimony))
+            money_weighted_return = _xirr(cash_flows)
             snapshots.append(
                 PatrimonySnapshot(
                     datetime=date,
@@ -147,11 +207,8 @@ class PatrimonyHistory:
                     market_value=market_value,
                     patrimony=patrimony,
                     cumulative_contributed=cumulative_contributed,
-                    investment_gain=(
-                        patrimony - opening_cash - cumulative_contributed
-                        if uses_raw_movements
-                        else patrimony - cumulative_contributed
-                    ),
+                    investment_gain=investment_gain,
+                    money_weighted_return=money_weighted_return,
                 )
             )
 
@@ -167,6 +224,7 @@ class PatrimonyHistory:
                     patrimony=Decimal("0"),
                     cumulative_contributed=Decimal("0"),
                     investment_gain=Decimal("0"),
+                    money_weighted_return=None,
                 ),
             )
 
