@@ -239,7 +239,15 @@ class PortfolioEngine:
         raise ValueError(f"Account not found: {account_id}")
 
     def apply_investment(self, portfolio, investment):
-        self._apply_buy(portfolio, investment.symbol, investment.symbol, investment.shares, investment.amount, investment.portfolio_class)
+        self._apply_buy(
+            portfolio,
+            investment.symbol,
+            investment.symbol,
+            investment.shares,
+            investment.amount,
+            investment.portfolio_class,
+            allow_insufficient_cash=True,
+        )
         account = self._resolve_portfolio_account(portfolio, investment.account_id, investment.broker)
         if account is not None:
             account.balance -= investment.amount
