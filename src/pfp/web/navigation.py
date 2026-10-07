@@ -16,10 +16,13 @@ NAVIGATION = (
     NavigationItem("Cuentas", "/accounts"),
     NavigationItem("Posiciones", "/positions"),
     NavigationItem("Movimientos", "/movements"),
+    NavigationItem("Conciliación", "/reconciliation-history"),
+)
+
+PORTFOLIO = (
     NavigationItem("Asignación", "/allocation"),
     NavigationItem("Objetivos", "/targets"),
     NavigationItem("Rebalanceo", "/rebalance"),
-    NavigationItem("Conciliación", "/reconciliation-history"),
 )
 
 OPERATIONS = (
@@ -38,10 +41,28 @@ def navigation_html(active_path: str = "/") -> str:
         active = ' aria-current="page" class="active"' if item.path == active_path else ""
         links.append(f'<a href="{item.path}"{active}>{item.label}</a>')
 
+    portfolio_active = active_path in {item.path for item in PORTFOLIO}
+    portfolio_open = " open" if portfolio_active else ""
+    portfolio_links = "".join(
+        f'<a href="{item.path}"'
+        f'{" aria-current=\"page\" class=\"active\"" if item.path == active_path else ""}>'
+        f'{item.label}</a>'
+        for item in PORTFOLIO
+    )
+    links.append(
+        f'<details class="operations-menu"{portfolio_open}>'
+        f'<summary>Cartera</summary>'
+        f'<div class="operations-dropdown">{portfolio_links}</div>'
+        f'</details>'
+    )
+
     operation_active = active_path in {item.path for item in OPERATIONS}
     open_attr = " open" if operation_active else ""
     operation_links = "".join(
-        f'<a href="{item.path}">{item.label}</a>' for item in OPERATIONS
+        f'<a href="{item.path}"'
+        f'{" aria-current=\"page\" class=\"active\"" if item.path == active_path else ""}>'
+        f'{item.label}</a>'
+        for item in OPERATIONS
     )
     links.append(
         f'<details class="operations-menu"{open_attr}>'
