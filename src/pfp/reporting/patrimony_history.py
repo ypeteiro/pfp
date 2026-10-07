@@ -18,11 +18,7 @@ def _normalize_datetime(value: datetime) -> datetime:
     return value.astimezone(timezone.utc).replace(tzinfo=None)
 
 
-def _xirr(
-    cash_flows: list[tuple[datetime, Decimal]],
-    *,
-    guess: Decimal = Decimal("0.10"),
-) -> Decimal | None:
+def _xirr(cash_flows: list[tuple[datetime, Decimal]]) -> Decimal | None:
     """Return annualized money-weighted return for dated cash flows."""
     if len(cash_flows) < 2:
         return None
@@ -195,8 +191,8 @@ class PatrimonyHistory:
                 else patrimony - cumulative_contributed
             )
             cash_flows = [(flow.datetime, -flow.amount) for flow in ordered_capital if _normalize_datetime(flow.datetime) <= date]
-            if opening_cash:
-                cash_flows.insert(0, (date if not cash_flows else cash_flows[0][0], -opening_cash))
+            if opening_cash and ordered_dates:
+                cash_flows.append((ordered_dates[0], -opening_cash))
             cash_flows.append((date, patrimony))
             money_weighted_return = _xirr(cash_flows)
             snapshots.append(
