@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from pfp.reporting.portfolio_report import PortfolioReport, PositionReport
+from pfp.web import dashboard_ui
 from pfp.web.app import WebApp
 
 
@@ -17,10 +18,11 @@ def make_report() -> PortfolioReport:
     )
 
 
-def test_root_route_uses_dashboard_v2():
+def test_root_route_uses_dashboard_v2(monkeypatch):
+    monkeypatch.setattr(dashboard_ui, "load_target_allocation", lambda: {"EQUITY": Decimal("75"), "FIXED_INCOME": Decimal("20"), "GOLD": Decimal("5")})
     html = WebApp(make_report()).render("/")
     assert "Tu patrimonio" in html
-    assert "Objetivo 75 / 20 / 5" in html
+    assert "Objetivo 75,00% / 20,00% / 5,00% / 0,00%" in html
     assert "Cartera" in html
     assert "P/L total" in html
     assert html.count("24.966,47 €") == 0
