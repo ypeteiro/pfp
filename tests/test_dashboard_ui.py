@@ -60,6 +60,8 @@ def test_dashboard_v2_renders_readable_patrimony_evolution_series_and_timeline()
 
     assert "Patrimonio" in html
     assert "Capital aportado" in html
+    assert "Evolución del patrimonio" in html
+    assert "Evolución patrimonial" not in html
     assert "Capital invertido" in html
     assert 'aria-label="Evolución temporal del patrimonio, capital aportado y capital invertido"' in html
     assert "10/01/26" in html
