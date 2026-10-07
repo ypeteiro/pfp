@@ -14,6 +14,9 @@ YAHOO_CURRENCY_SYMBOLS = {
 
 class YahooCurrencyRateProvider(CurrencyRateProvider):
 
+    def __init__(self):
+        self._history_cache = {}
+
     def _symbol(self, from_currency: str, to_currency: str) -> str:
         if from_currency == to_currency:
             return ""
@@ -41,6 +44,24 @@ class YahooCurrencyRateProvider(CurrencyRateProvider):
             )
         return Decimal(str(close)).quantize(Decimal("0.000001"))
 
+    def prefetch(self, from_currency: str, to_currency: str, dates) -> None:
+        if from_currency == to_currency:
+            return
+        requested = list(dates)
+        if not requested:
+            return
+        key = (from_currency, to_currency)
+        if key in self._history_cache:
+            return
+        start = min(requested)
+        end = max(requested) + timedelta(days=4)
+        ticker = yf.Ticker(self._symbol(from_currency, to_currency))
+        self._history_cache[key] = ticker.history(
+            start=start,
+            end=end,
+            auto_adjust=False,
+        )
+
     def get_rate_at(
         self,
         from_currency: str,
@@ -50,12 +71,14 @@ class YahooCurrencyRateProvider(CurrencyRateProvider):
         if from_currency == to_currency:
             return Decimal("1")
 
-        ticker = yf.Ticker(self._symbol(from_currency, to_currency))
-        history = ticker.history(
-            start=at,
-            end=at + timedelta(days=4),
-            auto_adjust=False,
-        )
+        history = self._history_cache.get((from_currency, to_currency))
+        if history is None:
+            ticker = yf.Ticker(self._symbol(from_currency, to_currency))
+            history = ticker.history(
+                start=at,
+                end=at + timedelta(days=4),
+                auto_adjust=False,
+            )
         if history.empty:
             raise ValueError(
                 f"No currency rate available for {from_currency}/{to_currency} at {at}"
