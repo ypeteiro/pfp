@@ -3,10 +3,12 @@ from decimal import Decimal
 
 from pfp.reporting.patrimony_series import PatrimonyPoint
 from pfp.reporting.portfolio_report import PortfolioReport, PositionReport
+from pfp.web import dashboard_ui
 from pfp.web.dashboard_ui import dashboard_v2_html
 
 
-def test_dashboard_v2_shows_strategy_and_main_metrics():
+def test_dashboard_v2_shows_strategy_and_main_metrics(monkeypatch):
+    monkeypatch.setattr(dashboard_ui, "load_target_allocation", lambda: {"EQUITY": Decimal("75"), "FIXED_INCOME": Decimal("20"), "GOLD": Decimal("5")})
     report = PortfolioReport(
         cash=Decimal("200"), invested=Decimal("1000"), market_value=Decimal("1000"), total_value=Decimal("1200"),
         realized_gain_loss=Decimal("10"), unrealized_gain_loss=Decimal("20"),
@@ -15,7 +17,7 @@ def test_dashboard_v2_shows_strategy_and_main_metrics():
     )
     html = dashboard_v2_html(report)
     assert "Tu patrimonio" in html
-    assert "75 / 20 / 5" in html
+    assert "Objetivo 75,00% / 20,00% / 5,00% / 0,00%" in html
     assert "allocation-panel-heading" in html
     assert "70,00%" in html
     assert "Aumentar" in html
