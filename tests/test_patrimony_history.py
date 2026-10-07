@@ -136,25 +136,26 @@ def test_money_weighted_return_is_annualized_from_dated_cash_flows():
         prices={D1: {"VWCE": Decimal("100")}, D6: {"VWCE": Decimal("110")}},
     )
 
-    assert snapshots[0].money_weighted_return is None
+    assert snapshots[0].money_weighted_return == Decimal("0")
     assert snapshots[1].money_weighted_return is not None
     assert abs(snapshots[1].money_weighted_return - Decimal("0.10")) < Decimal("0.000001")
 
 
 def test_money_weighted_return_accounts_for_timing_of_additional_contributions():
+    mid_date = datetime(2026, 7, 1, 10)
     snapshots = PatrimonyHistory.build(
-        [D1, datetime(2026, 7, 1, 10), D6],
+        [D1, mid_date, D6],
         external_cash_movements=[
             ExternalCashMovement(D1, "abanca", Decimal("1000")),
-            ExternalCashMovement(datetime(2026, 7, 1, 10), "abanca", Decimal("1000")),
+            ExternalCashMovement(mid_date, "abanca", Decimal("1000")),
         ],
         investments=[
             Investment(D1, "VWCE", Decimal("10"), Decimal("1000"), Decimal("100"), "EQUITY"),
-            Investment(datetime(2026, 7, 1, 10), "VWCE", Decimal("10"), Decimal("1000"), Decimal("100"), "EQUITY"),
+            Investment(mid_date, "VWCE", Decimal("10"), Decimal("1000"), Decimal("100"), "EQUITY"),
         ],
         prices={
             D1: {"VWCE": Decimal("100")},
-            datetime(2026, 7, 1, 10): {"VWCE": Decimal("100")},
+            mid_date: {"VWCE": Decimal("100")},
             D6: {"VWCE": Decimal("105")},
         },
     )
