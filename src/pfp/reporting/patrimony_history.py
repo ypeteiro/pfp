@@ -190,11 +190,18 @@ class PatrimonyHistory:
                 if uses_raw_movements
                 else patrimony - cumulative_contributed
             )
-            cash_flows = [(flow.datetime, -flow.amount) for flow in ordered_capital if _normalize_datetime(flow.datetime) <= date]
-            if opening_cash and ordered_dates:
-                cash_flows.append((ordered_dates[0], -opening_cash))
-            cash_flows.append((date, patrimony))
-            money_weighted_return = _xirr(cash_flows)
+            if date == ordered_dates[0]:
+                money_weighted_return = Decimal("0")
+            else:
+                cash_flows = [
+                    (flow.datetime, -flow.amount)
+                    for flow in ordered_capital
+                    if _normalize_datetime(flow.datetime) <= date
+                ]
+                if opening_cash:
+                    cash_flows.append((ordered_dates[0], -opening_cash))
+                cash_flows.append((date, patrimony))
+                money_weighted_return = _xirr(cash_flows)
             snapshots.append(
                 PatrimonySnapshot(
                     datetime=date,
