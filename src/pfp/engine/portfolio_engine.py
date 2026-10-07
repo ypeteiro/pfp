@@ -141,28 +141,20 @@ class PortfolioEngine:
         return portfolio
 
     def initialize_incremental(self, movements=()):
-        """Create the empty state needed to replay broker movements incrementally."""
         portfolio = Portfolio()
         portfolio.movements = movements
         accounts = {}
         for movement in movements:
             key = self._movement_account_key(movement)
             if key not in accounts:
-                accounts[key] = Account(
-                    name=self._movement_account_name(movement),
-                    broker=movement.broker,
-                    currency=movement.currency,
-                    account_id=key,
-                )
+                accounts[key] = Account(name=self._movement_account_name(movement), broker=movement.broker, currency=movement.currency, account_id=key)
                 portfolio.account_positions.setdefault(key, {})
         portfolio.accounts = list(accounts.values())
         return portfolio
 
     def apply_movement(self, portfolio, movement):
-        """Apply one broker movement to an already initialized portfolio."""
         key = self._movement_account_key(movement)
         account = self._get_or_create_incremental_account(portfolio, movement)
-
         if movement.type in {"TRANSFER_INSTANT_INBOUND", "TRANSFER_INBOUND"}:
             account.balance += movement.amount
             return portfolio
@@ -174,24 +166,8 @@ class PortfolioEngine:
                 return portfolio
             asset = AssetCatalog.get_or_create(movement.symbol, movement.name, movement.asset_class)
             cost = abs(movement.amount) + abs(movement.fee) + abs(movement.tax)
-            self._apply_buy(
-                portfolio,
-                movement.symbol,
-                asset.name,
-                movement.shares,
-                cost,
-                asset.portfolio_class,
-                allow_insufficient_cash=True,
-            )
-            self._apply_account_buy(
-                portfolio,
-                key,
-                movement.symbol,
-                asset.name,
-                movement.shares,
-                cost,
-                asset.portfolio_class,
-            )
+            self._apply_buy(portfolio, movement.symbol, asset.name, movement.shares, cost, asset.portfolio_class, allow_insufficient_cash=True)
+            self._apply_account_buy(portfolio, key, movement.symbol, asset.name, movement.shares, cost, asset.portfolio_class)
             account.balance -= cost
             return portfolio
         if movement.type == "SELL":
@@ -221,12 +197,7 @@ class PortfolioEngine:
             if account.account_id == key:
                 portfolio.account_positions.setdefault(key, {})
                 return account
-        account = Account(
-            name=cls._movement_account_name(movement),
-            broker=movement.broker,
-            currency=movement.currency,
-            account_id=key,
-        )
+        account = Account(name=cls._movement_account_name(movement), broker=movement.broker, currency=movement.currency, account_id=key)
         portfolio.accounts.append(account)
         portfolio.account_positions.setdefault(key, {})
         return account
@@ -246,7 +217,6 @@ class PortfolioEngine:
             investment.shares,
             investment.amount,
             investment.portfolio_class,
-            allow_insufficient_cash=True,
         )
         account = self._resolve_portfolio_account(portfolio, investment.account_id, investment.broker)
         if account is not None:
