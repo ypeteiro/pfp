@@ -26,8 +26,8 @@ def movements_html(report: PortfolioReport, broker: str = "", category: str = ""
 
     return f'''<h1>Movimientos</h1><p class="muted">Histórico de operaciones importadas, ordenado de más reciente a más antiguo.</p>
 <section class="panel movement-filters">{filter_form(brokers, categories, types, asset_classes, broker, category, movement_type, asset_class, search, date_from, date_to)}</section>
-<section class="metric-grid movement-metrics">{metric("Movimientos", Decimal(len(movements)), "count")}{metric("Compras", purchases)}{metric("Ventas", sales)}{metric("Comisiones", fees)}{metric("Impuestos", taxes)}</section>
-<section class="panel movements-panel"><div class="panel-heading"><h2>Histórico</h2><span>Flujo neto de efectivo {euro(total)}</span></div><div class="table-scroll"><table><thead><tr><th>Fecha</th><th>Broker</th><th>Categoría</th><th>Tipo</th><th>Activo</th><th>Participaciones</th><th>Precio</th><th>Importe</th><th>Comisión</th><th>Impuesto</th><th>Divisa</th><th>Descripción / ID</th></tr></thead><tbody>{rows}</tbody></table></div></section>'''
+<section class="metric-grid movement-metrics">{metric("Movimientos", Decimal(len(movements)), "count")}{metric("Compras", purchases, "","Importe bruto de las compras, sin comisiones ni impuestos.")}{metric("Ventas", sales, "","Importe bruto de las ventas, sin comisiones ni impuestos.")}{metric("Comisiones", fees, "","Coste total de las comisiones, mostrado como importe positivo.")}{metric("Impuestos", taxes, "","Coste total de los impuestos, mostrado como importe positivo.")}</section>
+<section class="panel movements-panel"><div class="panel-heading"><h2>Histórico</h2><span title="Suma de importe, comisión e impuesto de todos los movimientos filtrados. Los costes conservan su signo económico.">Flujo neto de efectivo {euro(total)}</span></div><div class="table-scroll"><table><thead><tr><th>Fecha</th><th>Broker</th><th>Categoría</th><th>Tipo</th><th>Activo</th><th>Participaciones</th><th>Precio</th><th>Importe</th><th>Comisión</th><th>Impuesto</th><th>Divisa</th><th>Descripción / ID</th></tr></thead><tbody>{rows}</tbody></table></div></section>'''
 
 
 def filter_form(brokers, categories, types, asset_classes, broker, category, movement_type, asset_class, search, date_from, date_to) -> str:
@@ -85,9 +85,10 @@ def is_sale(m: MovementReport) -> bool:
     return "SELL" in text or "VENTA" in text
 
 
-def metric(label: str, value: Decimal, tone: str = "") -> str:
+def metric(label: str, value: Decimal, tone: str = "", title: str = "") -> str:
     display = str(int(value)) if tone == "count" else euro(value)
-    return f'<article class="metric {tone}"><span>{escape(label)}</span><strong>{display}</strong></article>'
+    title_attr = f' title="{escape(title)}"' if title else ""
+    return f'<article class="metric {tone}"{title_attr}><span>{escape(label)}</span><strong>{display}</strong></article>'
 
 
 def decimal_or_dash(value: Decimal | None) -> str:
