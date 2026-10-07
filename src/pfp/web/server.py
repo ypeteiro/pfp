@@ -1,4 +1,4 @@
-"""HTTP server for the PFP web application."""
+"""HTTP server for the PFP web UI."""
 
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ from pfp.application.register_external_cash_movement import RegisterExternalCash
 from pfp.application.register_investment import RegisterInvestment, RegisterInvestmentRequest
 from pfp.application.register_sale import RegisterSale, RegisterSaleRequest
 from pfp.cli import DEFAULT_INVESTMENTS_FILE, DEFAULT_SALES_FILE, load_portfolio
+from pfp.config import save_target_allocation
 from pfp.domain.asset import Asset
 from pfp.domain.asset_catalog import AssetCatalog
 from pfp.domain.external_cash_movement import ExternalCashMovement
@@ -37,6 +38,7 @@ from pfp.reporting.patrimony_history import PatrimonyHistory
 from pfp.reporting.portfolio_report import PortfolioReport
 from pfp.web.app import WebApp
 from pfp.web.rebalance_ui import rebalance_html
+from pfp.web.targets_ui import targets_html
 
 DEFAULT_ASSETS_FILE = Path("data/assets.csv")
 DEFAULT_RECONCILIATIONS_FILE = Path("data/accounts/reconciliation_history.csv")
@@ -386,6 +388,13 @@ def parse_account_transfer_request(form: dict[str, list[str]]) -> RegisterAccoun
     )
 
 
+def parse_target_allocation_request(form: dict[str, list[str]]):
+    return {
+        key: Decimal(_required(form, key))
+        for key in ("EQUITY", "FIXED_INCOME", "GOLD", "CRYPTO")
+    }
+
+
 def serve(
     movements_file: Path,
     host: str = "127.0.0.1",
@@ -410,10 +419,7 @@ def serve(
             if path.startswith("/assets/lookup?"):
                 query = parse_qs(path.split("?", 1)[1])
                 isin = query.get("isin", [""])[0].strip()
-                body = json.dumps(
-                    _asset_lookup_payload(isin),
-                    ensure_ascii=False,
-                ).encode("utf-8")
+                body = json.dumps(_asset_lookup_payload(isin), ensure_ascii=False).encode("utf-8")
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json; charset=utf-8")
                 self.send_header("Content-Length", str(len(body)))
@@ -431,6 +437,14 @@ def serve(
                 self.send_response(303)
                 self.send_header("Location", "/")
                 self.end_headers()
+                return
+            if path == "/targets":
+                body = app._layout(targets_html(), "/targets").encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
                 return
             if path == "/rebalance" or path.startswith("/rebalance?"):
                 query = parse_qs(path.split("?", 1)[1] if "?" in path else "")
@@ -459,7 +473,7 @@ def serve(
 
         def do_POST(self):
             nonlocal app
-            allowed = {"/investments", "/sales", "/assets", "/reconcile", "/accounts/adjust", "/account-transfers"}
+            allowed = {"/investments", "/sales", "/assets", "/reconcile", "/accounts/adjust", "/account-transfers", "/targets"}
             if self.path not in allowed:
                 self.send_error(404)
                 return
@@ -474,6 +488,8 @@ def serve(
                     runtime.register_sale(parse_sale_request(form))
                 elif self.path == "/assets":
                     runtime.register_asset(parse_asset_request(form))
+                elif self.path == "/targets":
+                    save_target_allocation(parse_target_allocation_request(form))
                 elif self.path == "/accounts/adjust":
                     account_id, target_balance, when, description = parse_account_adjustment_request(form)
                     account = next((item for item in runtime.portfolio.accounts if item.id == account_id), None)
@@ -508,7 +524,7 @@ def serve(
                     self.wfile.write(body)
                     return
                 app = WebApp(runtime.report(), AssetCatalog.all(), tuple(reconciliation_repository.load()), tuple(runtime.portfolio.accounts))
-                redirect = "/accounts" if self.path in {"/accounts/adjust", "/account-transfers"} else ("/positions" if self.path != "/assets" else "/assets")
+                redirect = "/targets" if self.path == "/targets" else ("/accounts" if self.path in {"/accounts/adjust", "/account-transfers"} else ("/positions" if self.path != "/assets" else "/assets"))
             except (ValueError, InvalidOperation) as exc:
                 values = {key: values[0] if values else "" for key, values in form.items()}
                 if self.path == "/investments":
@@ -517,6 +533,8 @@ def serve(
                     body = app.render_sale_form(str(exc), values).encode("utf-8")
                 elif self.path == "/reconcile":
                     body = app.render_reconciliation_form(str(exc), values, values.get("account_id")).encode("utf-8")
+                elif self.path == "/targets":
+                    body = app._layout(targets_html(str(exc), values), "/targets").encode("utf-8")
                 elif self.path in {"/accounts/adjust", "/account-transfers"}:
                     body = app.render(path="/accounts").encode("utf-8")
                 else:
