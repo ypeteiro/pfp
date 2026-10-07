@@ -149,9 +149,15 @@ def _evolution_summary(evolution: PatrimonyEvolution, points: tuple[PatrimonyPoi
 
     svg = f'<svg class="patrimony-chart" viewBox="0 0 {width} {height}" role="img" aria-label="Evolución temporal del patrimonio, capital aportado y capital invertido" style="width:100%;height:auto;display:block"><g>{"".join(ticks)}</g><g>{"".join(date_labels)}</g><g>{"".join(lines)}</g><g>{"".join(points_svg)}</g><g>{"".join(end_labels)}</g></svg>'
     legend = '<div style="display:flex;flex-wrap:wrap;gap:18px;margin:10px 0 16px;font-size:13px"><span style="color:#2563eb;font-weight:600">━━ Patrimonio</span><span style="color:#64748b;font-weight:600">┄┄ Capital aportado</span><span style="color:#059669;font-weight:600">··· Capital invertido</span></div>'
-    money_weighted_return = last.money_weighted_return
-    return_tone = "positive" if money_weighted_return is not None and money_weighted_return > 0 else "negative" if money_weighted_return is not None and money_weighted_return < 0 else ""
-    return f'<section class="panel patrimony-evolution"><div class="panel-heading"><div><h2>Evolución patrimonial {tooltip("Patrimonio = efectivo + valor de mercado. Capital aportado = aportaciones netas. Capital invertido = coste de las posiciones.")}</h2><p class="muted evolution-description">La línea continua es tu patrimonio. La discontinua es lo que has aportado. La punteada es el capital destinado a comprar tus inversiones.</p></div><span>{len(points)} puntos históricos</span></div>{svg}{legend}<div class="evolution-summary"><div><span>Patrimonio actual</span><strong>{euro(last.patrimony)}</strong></div><div><span>Capital aportado</span><strong>{euro(last.cumulative_contributed)}</strong></div><div><span>Capital invertido</span><strong>{euro(last.invested_cost)}</strong></div><div><span>Rendimiento acumulado</span><strong class="{return_tone}">{euro(total_pl)} · {pct(money_weighted_return)}</strong></div></div></section>'
+
+    # The percentage shown next to P/L must describe the same economic result.
+    # Use cumulative P/L over cumulative contributed capital, rather than XIRR,
+    # so a positive P/L can never be presented as a negative return.
+    contributed = last.cumulative_contributed
+    accumulated_return = total_pl / contributed if contributed != 0 else None
+    return_tone = "positive" if total_pl > 0 else "negative" if total_pl < 0 else ""
+
+    return f'<section class="panel patrimony-evolution"><div class="panel-heading"><div><h2>Evolución patrimonial {tooltip("Patrimonio = efectivo + valor de mercado. Capital aportado = aportaciones netas. Capital invertido = coste de las posiciones.")}</h2><p class="muted evolution-description">La línea continua es tu patrimonio. La discontinua es lo que has aportado. La punteada es el capital destinado a comprar tus inversiones.</p></div><span>{len(points)} puntos históricos</span></div>{svg}{legend}<div class="evolution-summary"><div><span>Patrimonio actual</span><strong>{euro(last.patrimony)}</strong></div><div><span>Capital aportado</span><strong>{euro(last.cumulative_contributed)}</strong></div><div><span>Capital invertido</span><strong>{euro(last.invested_cost)}</strong></div><div><span>Rentabilidad acumulada</span><strong class="{return_tone}">{euro(total_pl)} · {pct(accumulated_return)}</strong></div></div></section>'
 
 
 def metric(label: str, value: Decimal, tone: str = "") -> str:
