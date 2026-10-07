@@ -7,7 +7,7 @@ from pfp.config import load_target_allocation
 from pfp.excel.allocation_actions import AllocationRow, build_allocation_rows
 from pfp.reporting.portfolio_report import PortfolioReport
 
-LABELS = {"EQUITY": "Renta variable", "FIXED_INCOME": "Renta fija", "GOLD": "Oro", "CRYPTO": "Cripto"}
+LABELS = {"RV": "Renta variable", "RF": "Renta fija", "GOLD": "Oro", "CRYPTO": "Cripto"}
 
 
 def allocation_html(report: PortfolioReport) -> str:
