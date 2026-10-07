@@ -70,6 +70,15 @@ class PatrimonyHistory:
         snapshots: list[PatrimonySnapshot] = []
         uses_raw_movements = bool(ordered_movements)
 
+        prefetch = getattr(provider, "prefetch", None)
+        if prefetch is not None and ordered_dates:
+            symbols = {
+                item.symbol
+                for item in (*ordered_movements, *ordered_investments, *ordered_sales)
+                if getattr(item, "symbol", None)
+            }
+            prefetch(symbols, ordered_dates)
+
         for date in ordered_dates:
             applicable_investments = tuple(
                 investment for investment in ordered_investments
