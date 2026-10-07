@@ -4,6 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from html import escape
 
+from pfp.config import load_target_allocation
 from pfp.domain.capital_flow import CapitalFlow, FlowType
 from pfp.excel.allocation_actions import build_allocation_rows
 from pfp.importers.trade_republic import TradeRepublicImporter
@@ -13,10 +14,10 @@ from pfp.reporting.portfolio_report import PortfolioReport
 
 ALLOCATION_LABELS = {"RV": "Renta variable", "RF": "Renta fija", "Oro": "Oro", "Cripto": "Criptoactivos"}
 ALLOCATION_TIPS = {
-    "RV": "Acciones y otros activos de renta variable. Objetivo actual: 75%.",
-    "RF": "Bonos, fondos y otros activos de renta fija. Objetivo actual: 20%.",
-    "Oro": "Exposición al oro como activo diversificador. Objetivo actual: 5%.",
-    "Cripto": "Criptoactivos. Actualmente no tienen una asignación objetivo específica.",
+    "RV": "Acciones y otros activos de renta variable.",
+    "RF": "Bonos, fondos y otros activos de renta fija.",
+    "Oro": "Exposición al oro como activo diversificador.",
+    "Cripto": "Criptoactivos.",
 }
 METRIC_TIPS = {
     "Patrimonio total": "Efectivo más el valor de mercado de tus posiciones.",
@@ -31,7 +32,13 @@ METRIC_TIPS = {
 def dashboard_v2_html(report: PortfolioReport, sort: str = "weight", direction: str = "desc") -> str:
     total = report.market_value
     values = {"RV": report.equity_value, "RF": report.fixed_income_value, "Oro": report.gold_value, "Cripto": report.crypto_value}
-    targets = {"RV": Decimal("0.75"), "RF": Decimal("0.20"), "Oro": Decimal("0.05"), "Cripto": Decimal("0")}
+    configured_targets = load_target_allocation()
+    targets = {
+        "RV": configured_targets.get("EQUITY", Decimal("0")) / Decimal("100"),
+        "RF": configured_targets.get("FIXED_INCOME", Decimal("0")) / Decimal("100"),
+        "Oro": configured_targets.get("GOLD", Decimal("0")) / Decimal("100"),
+        "Cripto": configured_targets.get("CRYPTO", Decimal("0")) / Decimal("100"),
+    }
     allocation = build_allocation_rows(values, targets, total)
     bars = []
     for row in allocation:
@@ -52,7 +59,7 @@ def dashboard_v2_html(report: PortfolioReport, sort: str = "weight", direction: 
   <div class="hero"><div><h1>Tu patrimonio</h1><p class="muted">Una lectura rápida de dónde está tu dinero y cómo se desvía de tu estrategia.</p>{price_status}</div></div>
   <section class="metric-grid">{metric("Patrimonio total", report.total_value)}{metric("Efectivo", report.cash)}{metric("Cartera invertida", report.market_value)}{metric("P/L realizado", report.realized_gain_loss)}{metric("P/L no realizado", report.unrealized_gain_loss)}{metric("P/L total", total_pl, "positive" if total_pl >= 0 else "negative")}</section>
   {evolution_html}
-  <section class="two-col"><article class="panel"><div class="panel-heading allocation-panel-heading"><h2>Asignación {tooltip("Distribución actual de tu patrimonio por clase de activo.")}</h2><span>Objetivo 75 / 20 / 5</span></div>{''.join(bars)}</article><article class="panel"><div class="panel-heading"><h2>Posiciones principales</h2><span>{len(report.positions)} activos</span></div><table><thead><tr>{sort_heading("Activo", "symbol", sort, direction)}{sort_heading("Nombre", "name", sort, direction)}{sort_heading("Peso", "weight", sort, direction)}{sort_heading("Valor", "value", sort, direction)}<th>P/L</th></tr></thead><tbody>{position_rows or '<tr><td colspan="5">Sin posiciones</td></tr>'}</tbody></table></article></section>
+  <section class="two-col"><article class="panel"><div class="panel-heading allocation-panel-heading"><h2>Asignación {tooltip("Distribución actual de tu patrimonio por clase de activo.")}</h2><span>Objetivo {pct(targets["RV"])} / {pct(targets["RF"])} / {pct(targets["Oro"])} / {pct(targets["Cripto"])}</span></div>{''.join(bars)}</article><article class="panel"><div class="panel-heading"><h2>Posiciones principales</h2><span>{len(report.positions)} activos</span></div><table><thead><tr>{sort_heading("Activo", "symbol", sort, direction)}{sort_heading("Nombre", "name", sort, direction)}{sort_heading("Peso", "weight", sort, direction)}{sort_heading("Valor", "value", sort, direction)}<th>P/L</th></tr></thead><tbody>{position_rows or '<tr><td colspan="5">Sin posiciones</td></tr>'}</tbody></table></article></section>
 </section>
 """
 
