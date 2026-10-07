@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from openpyxl import load_workbook
 
+from pfp.config import load_target_allocation
 from pfp.domain.portfolio import Portfolio
 from pfp.domain.position import Position
 from pfp.excel.workbook import WorkbookWriter
@@ -33,7 +34,9 @@ def test_workbook_writer_creates_full_workbook(tmp_path):
     assert workbook["Posiciones"]["F2"].value == Decimal("100")
     assert workbook["Posiciones"]["H2"].value == Decimal("240")
     assert workbook["Asignación"]["A2"].value == "RV"
-    assert workbook["Asignación"]["B2"].value == Decimal("0.75")
+    assert workbook["Asignación"]["B2"].value == float(
+        load_target_allocation()["EQUITY"] / Decimal("100")
+    )
 
 
 def test_workbook_writer_uses_current_target_allocation(tmp_path, monkeypatch):
@@ -50,10 +53,10 @@ def test_workbook_writer_uses_current_target_allocation(tmp_path, monkeypatch):
     workbook = load_workbook(output, data_only=False)
 
     allocation = workbook["Asignación"]
-    assert allocation["B2"].value == Decimal("0.60")
-    assert allocation["B3"].value == Decimal("0.30")
-    assert allocation["B4"].value == Decimal("0.10")
-    assert allocation["B5"].value == Decimal("0")
+    assert allocation["B2"].value == 0.60
+    assert allocation["B3"].value == 0.30
+    assert allocation["B4"].value == 0.10
+    assert allocation["B5"].value == 0.0
 
 
 def test_workbook_writer_creates_parent_directory(tmp_path):
