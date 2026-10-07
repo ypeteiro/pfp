@@ -140,6 +140,104 @@ class PortfolioEngine:
         portfolio.cash = sum(account_cash.values(), Decimal("0")) + unallocated_cash
         return portfolio
 
+    def initialize_incremental(self, movements=()):
+        """Create the empty state needed to replay broker movements incrementally."""
+        portfolio = Portfolio()
+        portfolio.movements = movements
+        accounts = {}
+        for movement in movements:
+            key = self._movement_account_key(movement)
+            if key not in accounts:
+                accounts[key] = Account(
+                    name=self._movement_account_name(movement),
+                    broker=movement.broker,
+                    currency=movement.currency,
+                    account_id=key,
+                )
+                portfolio.account_positions.setdefault(key, {})
+        portfolio.accounts = list(accounts.values())
+        return portfolio
+
+    def apply_movement(self, portfolio, movement):
+        """Apply one broker movement to an already initialized portfolio."""
+        key = self._movement_account_key(movement)
+        account = self._get_or_create_incremental_account(portfolio, movement)
+
+        if movement.type in {"TRANSFER_INSTANT_INBOUND", "TRANSFER_INBOUND"}:
+            account.balance += movement.amount
+            return portfolio
+        if movement.type in {"TRANSFER_INSTANT_OUTBOUND", "TRANSFER_OUTBOUND"}:
+            account.balance -= abs(movement.amount)
+            return portfolio
+        if movement.type == "BUY":
+            if movement.symbol is None or movement.shares is None or movement.price is None:
+                return portfolio
+            asset = AssetCatalog.get_or_create(movement.symbol, movement.name, movement.asset_class)
+            cost = abs(movement.amount) + abs(movement.fee) + abs(movement.tax)
+            self._apply_buy(
+                portfolio,
+                movement.symbol,
+                asset.name,
+                movement.shares,
+                cost,
+                asset.portfolio_class,
+                allow_insufficient_cash=True,
+            )
+            self._apply_account_buy(
+                portfolio,
+                key,
+                movement.symbol,
+                asset.name,
+                movement.shares,
+                cost,
+                asset.portfolio_class,
+            )
+            account.balance -= cost
+            return portfolio
+        if movement.type == "SELL":
+            if movement.symbol is None or movement.shares is None or movement.amount is None:
+                return portfolio
+            shares = abs(Decimal(str(movement.shares)))
+            proceeds = movement.amount + movement.fee + movement.tax
+            self._apply_sell(portfolio, movement.symbol, shares, proceeds)
+            operation_account = self._resolve_account_position_id(portfolio, key, movement.symbol, shares)
+            self._apply_account_sell(portfolio, operation_account, movement.symbol, shares, proceeds)
+            self._account_by_id(portfolio, operation_account).balance += proceeds
+            return portfolio
+        return portfolio
+
+    @staticmethod
+    def _movement_account_key(movement):
+        return movement.account_id or f"{movement.account_type}:{movement.broker}:{movement.currency}"
+
+    @staticmethod
+    def _movement_account_name(movement):
+        return movement.account_id or movement.broker
+
+    @classmethod
+    def _get_or_create_incremental_account(cls, portfolio, movement):
+        key = cls._movement_account_key(movement)
+        for account in portfolio.accounts:
+            if account.account_id == key:
+                portfolio.account_positions.setdefault(key, {})
+                return account
+        account = Account(
+            name=cls._movement_account_name(movement),
+            broker=movement.broker,
+            currency=movement.currency,
+            account_id=key,
+        )
+        portfolio.accounts.append(account)
+        portfolio.account_positions.setdefault(key, {})
+        return account
+
+    @staticmethod
+    def _account_by_id(portfolio, account_id):
+        for account in portfolio.accounts:
+            if account.account_id == account_id:
+                return account
+        raise ValueError(f"Account not found: {account_id}")
+
     def apply_investment(self, portfolio, investment):
         self._apply_buy(portfolio, investment.symbol, investment.symbol, investment.shares, investment.amount, investment.portfolio_class)
         account = self._resolve_portfolio_account(portfolio, investment.account_id, investment.broker)
