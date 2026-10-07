@@ -63,10 +63,11 @@ class PortfolioEngine:
             elif movement.type == "SELL":
                 if movement.symbol is None or movement.shares is None or movement.amount is None:
                     continue
+                shares = abs(Decimal(str(movement.shares)))
                 proceeds = movement.amount + movement.fee + movement.tax
-                self._apply_sell(portfolio, movement.symbol, movement.shares, proceeds)
-                operation_account = self._resolve_account_position_id(portfolio, key, movement.symbol, movement.shares)
-                self._apply_account_sell(portfolio, operation_account, movement.symbol, movement.shares, proceeds)
+                self._apply_sell(portfolio, movement.symbol, shares, proceeds)
+                operation_account = self._resolve_account_position_id(portfolio, key, movement.symbol, shares)
+                self._apply_account_sell(portfolio, operation_account, movement.symbol, shares, proceeds)
                 account_cash[operation_account] += proceeds
 
         if opening_balances is not None:
@@ -106,10 +107,11 @@ class PortfolioEngine:
                     unallocated_cash -= investment.amount
         if sales is not None:
             for sale in sales:
-                self._apply_sell(portfolio, sale.symbol, sale.shares, sale.amount)
+                shares = abs(Decimal(str(sale.shares)))
+                self._apply_sell(portfolio, sale.symbol, shares, sale.amount)
                 operation_account = resolve_operation_account(sale, "Trade Republic")
                 if operation_account is not None:
-                    self._apply_account_sell(portfolio, operation_account, sale.symbol, sale.shares, sale.amount, strict=False)
+                    self._apply_account_sell(portfolio, operation_account, sale.symbol, shares, sale.amount, strict=False)
                     account_cash[operation_account] += sale.amount
                 else:
                     unallocated_cash += sale.amount
@@ -149,11 +151,12 @@ class PortfolioEngine:
         return portfolio
 
     def apply_sale(self, portfolio, sale):
-        self._apply_sell(portfolio, sale.symbol, sale.shares, sale.amount)
+        shares = abs(Decimal(str(sale.shares)))
+        self._apply_sell(portfolio, sale.symbol, shares, sale.amount)
         account = self._resolve_portfolio_account(portfolio, sale.account_id, sale.broker)
         if account is not None:
             account.balance += sale.amount
-            self._apply_account_sell(portfolio, account.account_id, sale.symbol, sale.shares, sale.amount)
+            self._apply_account_sell(portfolio, account.account_id, sale.symbol, shares, sale.amount)
         portfolio.invested = sum(position.invested for position in portfolio.positions.values())
         portfolio.positions[sale.symbol].validate()
         return portfolio
@@ -246,7 +249,7 @@ class PortfolioEngine:
         position.validate()
 
     def _apply_sell(self, portfolio, symbol, shares, amount):
-        shares = Decimal(str(shares))
+        shares = abs(Decimal(str(shares)))
         amount = Decimal(str(amount))
         if shares <= 0:
             raise ValueError("Shares must be greater than zero")
