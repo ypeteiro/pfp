@@ -50,8 +50,10 @@ def validate_movements(movements: list[Movement]) -> tuple[ImportValidationIssue
         for field, value in (("amount", movement.amount), ("fee", movement.fee), ("tax", movement.tax)):
             if not isinstance(value, Decimal) or not value.is_finite():
                 issues.append(ImportValidationIssue(row, "NON_FINITE_AMOUNT", f"{field} no es un importe decimal finito.", tx or None))
-        if movement.shares is not None and movement.shares < Decimal("0"):
-            issues.append(ImportValidationIssue(row, "NEGATIVE_SHARES", "Las participaciones no pueden ser negativas.", tx or None))
+        if movement.shares is not None and (
+            not isinstance(movement.shares, Decimal) or not movement.shares.is_finite()
+        ):
+            issues.append(ImportValidationIssue(row, "NON_FINITE_SHARES", "Las participaciones deben ser un decimal finito.", tx or None))
         if movement.price is not None and movement.price < Decimal("0"):
             issues.append(ImportValidationIssue(row, "NEGATIVE_PRICE", "El precio no puede ser negativo.", tx or None))
 
