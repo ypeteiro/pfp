@@ -13,7 +13,6 @@ from pfp.reporting.historical_prices import HistoricalPriceProvider, MappingHist
 
 
 def _normalize_datetime(value: datetime) -> datetime:
-    """Use naive UTC datetimes consistently inside historical reporting."""
     if value.tzinfo is None:
         return value
     return value.astimezone(timezone.utc).replace(tzinfo=None)
@@ -54,9 +53,7 @@ class PatrimonyHistory:
         capital_movements = external_cash_movements if capital_movements is None else capital_movements
         if capital_movements is external_cash_movements:
             trade_republic_movements = tuple(
-                movement
-                for movement in external_cash_movements
-                if movement.account_id == "Trade Republic"
+                movement for movement in external_cash_movements if movement.account_id == "Trade Republic"
             )
             if trade_republic_movements:
                 capital_movements = trade_republic_movements
@@ -79,70 +76,67 @@ class PatrimonyHistory:
             }
             prefetch(symbols, ordered_dates)
 
-        # The old implementation rebuilt the whole portfolio from scratch for
-        # every date. With a long transaction history that became the dominant
-        # cost. Replay the ordered events once and only advance cursors as dates
-        # move forward.
         engine = PortfolioEngine()
         historical_portfolio = engine.initialize_incremental(ordered_movements) if uses_raw_movements else None
         movement_index = investment_index = sales_index = 0
+
+        # Keep the non-raw reconstruction state alive across dates. The previous
+        # optimized version recreated holdings on every snapshot while keeping
+        # the investment/sale cursors advanced, which lost positions after the
+        # date on which they were first applied.
+        nonraw_cash = opening_cash
+        nonraw_holdings: dict[str, Decimal] = {}
+        nonraw_invested = Decimal("0")
 
         for date in ordered_dates:
             if uses_raw_movements:
                 while movement_index < len(ordered_movements) and _normalize_datetime(ordered_movements[movement_index].datetime) <= date:
                     engine.apply_movement(historical_portfolio, ordered_movements[movement_index])
                     movement_index += 1
-
                 while investment_index < len(ordered_investments) and _normalize_datetime(ordered_investments[investment_index].datetime) <= date:
                     engine.apply_investment(historical_portfolio, ordered_investments[investment_index])
                     investment_index += 1
-
                 while sales_index < len(ordered_sales) and _normalize_datetime(ordered_sales[sales_index].datetime) <= date:
                     engine.apply_sale(historical_portfolio, ordered_sales[sales_index])
                     sales_index += 1
 
-                historical_portfolio.invested = sum(
-                    position.invested for position in historical_portfolio.positions.values()
-                )
+                historical_portfolio.invested = sum(position.invested for position in historical_portfolio.positions.values())
                 for position in historical_portfolio.positions.values():
                     position.validate()
 
                 cash = opening_cash + sum(
-                    (
-                        movement.amount
-                        for movement in ordered_external
-                        if movement.account_id != "Trade Republic"
-                        and _normalize_datetime(movement.datetime) <= date
-                    ),
-                    Decimal("0"),
+                    movement.amount
+                    for movement in ordered_external
+                    if movement.account_id != "Trade Republic" and _normalize_datetime(movement.datetime) <= date
                 ) + sum((account.balance for account in historical_portfolio.accounts), Decimal("0"))
                 invested_cost = historical_portfolio.invested
                 holdings = historical_portfolio.positions
             else:
-                cash = opening_cash
-                cumulative_invested = Decimal("0")
-                holdings: dict[str, Decimal] = {}
                 while investment_index < len(ordered_investments) and _normalize_datetime(ordered_investments[investment_index].datetime) <= date:
                     investment = ordered_investments[investment_index]
-                    cash -= investment.amount
-                    holdings[investment.symbol] = holdings.get(investment.symbol, Decimal("0")) + investment.shares
-                    cumulative_invested += investment.amount
+                    nonraw_cash -= investment.amount
+                    nonraw_holdings[investment.symbol] = nonraw_holdings.get(investment.symbol, Decimal("0")) + investment.shares
+                    nonraw_invested += investment.amount
                     investment_index += 1
                 while sales_index < len(ordered_sales) and _normalize_datetime(ordered_sales[sales_index].datetime) <= date:
                     sale = ordered_sales[sales_index]
-                    cash += sale.amount
-                    holdings[sale.symbol] = holdings.get(sale.symbol, Decimal("0")) - sale.shares
-                    cumulative_invested -= sale.amount
+                    nonraw_cash += sale.amount
+                    nonraw_holdings[sale.symbol] = nonraw_holdings.get(sale.symbol, Decimal("0")) - abs(Decimal(str(sale.shares)))
+                    # invested_cost is the remaining cost basis. Without a full
+                    # position engine here, a sale at the recorded amount is the
+                    # historical convention already used by this reconstruction.
+                    nonraw_invested -= sale.amount
                     sales_index += 1
                 for movement in ordered_external:
                     if _normalize_datetime(movement.datetime) <= date:
-                        cash += movement.amount
-                invested_cost = cumulative_invested
+                        nonraw_cash += movement.amount
+                cash = nonraw_cash
+                invested_cost = nonraw_invested
+                holdings = nonraw_holdings
 
-            cumulative_contributed = Decimal("0")
-            for flow in ordered_capital:
-                if _normalize_datetime(flow.datetime) <= date:
-                    cumulative_contributed += flow.amount
+            cumulative_contributed = sum(
+                flow.amount for flow in ordered_capital if _normalize_datetime(flow.datetime) <= date
+            )
 
             market_value = Decimal("0")
             for symbol, position in holdings.items():
@@ -152,7 +146,6 @@ class PatrimonyHistory:
                     market_value += shares * price
 
             patrimony = cash + market_value
-            initial_wealth = opening_cash if uses_raw_movements else Decimal("0")
             snapshots.append(
                 PatrimonySnapshot(
                     datetime=date,
@@ -161,7 +154,7 @@ class PatrimonyHistory:
                     market_value=market_value,
                     patrimony=patrimony,
                     cumulative_contributed=cumulative_contributed,
-                    investment_gain=patrimony - initial_wealth - cumulative_contributed,
+                    investment_gain=patrimony - cumulative_contributed,
                 )
             )
 
