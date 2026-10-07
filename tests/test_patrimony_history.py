@@ -13,6 +13,7 @@ D2 = datetime(2026, 1, 2, 10)
 D3 = datetime(2026, 1, 3, 10)
 D4 = datetime(2026, 1, 4, 10)
 D5 = datetime(2026, 1, 5, 10)
+D6 = datetime(2027, 1, 1, 10)
 
 
 def test_external_contribution_increases_cash_and_contributed_capital():
@@ -125,3 +126,38 @@ def test_complete_history_separates_contributions_from_investment_performance():
     assert snapshots[4].patrimony == Decimal("1600")
     assert snapshots[4].cumulative_contributed == Decimal("1300")
     assert snapshots[4].investment_gain == Decimal("300")
+
+
+def test_money_weighted_return_is_annualized_from_dated_cash_flows():
+    snapshots = PatrimonyHistory.build(
+        [D1, D6],
+        external_cash_movements=[ExternalCashMovement(D1, "abanca", Decimal("1000"))],
+        investments=[Investment(D1, "VWCE", Decimal("10"), Decimal("1000"), Decimal("100"), "EQUITY")],
+        prices={D1: {"VWCE": Decimal("100")}, D6: {"VWCE": Decimal("110")}},
+    )
+
+    assert snapshots[0].money_weighted_return is None
+    assert snapshots[1].money_weighted_return is not None
+    assert abs(snapshots[1].money_weighted_return - Decimal("0.10")) < Decimal("0.000001")
+
+
+def test_money_weighted_return_accounts_for_timing_of_additional_contributions():
+    snapshots = PatrimonyHistory.build(
+        [D1, datetime(2026, 7, 1, 10), D6],
+        external_cash_movements=[
+            ExternalCashMovement(D1, "abanca", Decimal("1000")),
+            ExternalCashMovement(datetime(2026, 7, 1, 10), "abanca", Decimal("1000")),
+        ],
+        investments=[
+            Investment(D1, "VWCE", Decimal("10"), Decimal("1000"), Decimal("100"), "EQUITY"),
+            Investment(datetime(2026, 7, 1, 10), "VWCE", Decimal("10"), Decimal("1000"), Decimal("100"), "EQUITY"),
+        ],
+        prices={
+            D1: {"VWCE": Decimal("100")},
+            datetime(2026, 7, 1, 10): {"VWCE": Decimal("100")},
+            D6: {"VWCE": Decimal("105")},
+        },
+    )
+
+    assert snapshots[-1].money_weighted_return is not None
+    assert abs(snapshots[-1].money_weighted_return - Decimal("0.0668912")) < Decimal("0.000001")
