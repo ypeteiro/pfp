@@ -9,7 +9,7 @@ from pfp.reporting.portfolio_report import MovementReport, PortfolioReport
 def movements_html(report: PortfolioReport, broker: str = "", category: str = "", movement_type: str = "", asset_class: str = "", search: str = "", date_from: str = "", date_to: str = "") -> str:
     movements = [m for m in report.movements if matches_filters(m, broker, category, movement_type, asset_class, search, date_from, date_to)]
     movements.sort(key=lambda m: m.datetime, reverse=True)
-    total = sum((m.amount for m in movements), Decimal("0"))
+    total = sum((m.amount - m.fee - m.tax for m in movements), Decimal("0"))
     fees = sum((m.fee for m in movements), Decimal("0"))
     taxes = sum((m.tax for m in movements), Decimal("0"))
     purchases = sum((abs(m.amount) for m in movements if is_purchase(m)), Decimal("0"))
@@ -27,7 +27,7 @@ def movements_html(report: PortfolioReport, broker: str = "", category: str = ""
     return f'''<h1>Movimientos</h1><p class="muted">Histórico de operaciones importadas, ordenado de más reciente a más antiguo.</p>
 <section class="panel movement-filters">{filter_form(brokers, categories, types, asset_classes, broker, category, movement_type, asset_class, search, date_from, date_to)}</section>
 <section class="metric-grid movement-metrics">{metric("Movimientos", Decimal(len(movements)), "count")}{metric("Compras", purchases)}{metric("Ventas", sales)}{metric("Comisiones", fees)}{metric("Impuestos", taxes)}</section>
-<section class="panel movements-panel"><div class="panel-heading"><h2>Histórico</h2><span>Flujo neto {euro(total)}</span></div><div class="table-scroll"><table><thead><tr><th>Fecha</th><th>Broker</th><th>Categoría</th><th>Tipo</th><th>Activo</th><th>Participaciones</th><th>Precio</th><th>Importe</th><th>Comisión</th><th>Impuesto</th><th>Divisa</th><th>Descripción / ID</th></tr></thead><tbody>{rows}</tbody></table></div></section>'''
+<section class="panel movements-panel"><div class="panel-heading"><h2>Histórico</h2><span>Flujo neto de efectivo {euro(total)}</span></div><div class="table-scroll"><table><thead><tr><th>Fecha</th><th>Broker</th><th>Categoría</th><th>Tipo</th><th>Activo</th><th>Participaciones</th><th>Precio</th><th>Importe</th><th>Comisión</th><th>Impuesto</th><th>Divisa</th><th>Descripción / ID</th></tr></thead><tbody>{rows}</tbody></table></div></section>'''
 
 
 def filter_form(brokers, categories, types, asset_classes, broker, category, movement_type, asset_class, search, date_from, date_to) -> str:
