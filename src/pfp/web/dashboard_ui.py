@@ -147,6 +147,7 @@ def _evolution_summary(evolution: PatrimonyEvolution, points: tuple[PatrimonyPoi
         line_x = label_x - 10
         end_labels.append(f'<line x1="{xs[-1]+6:.1f}" y1="{y_for(value):.1f}" x2="{line_x}" y2="{y:.1f}" style="stroke:{stroke};stroke-width:1.5" /><text x="{label_x}" y="{y+4:.1f}" text-anchor="end" style="fill:{stroke};font-size:12px;font-weight:600">{escape(label)} · {escape(euro(value))}</text>')
 
+    svg = f'<svg viewBox="0 0 {width} {height}" role="img" aria-label="Evolución histórica del patrimonio" style="width:100%;height:auto;display:block"><g>{"".join(ticks)}</g><g>{"".join(date_labels)}</g><g>{"".join(lines)}</g><g>{"".join(points_svg)}</g><g>{"".join(end_labels)}</g></svg>'
     legend = '<div style="display:flex;flex-wrap:wrap;gap:18px;margin:10px 0 16px;font-size:13px"><span style="color:#2563eb;font-weight:600">━━ Patrimonio</span><span style="color:#64748b;font-weight:600">┄┄ Capital aportado</span><span style="color:#059669;font-weight:600">··· Capital invertido</span></div>'
     money_weighted_return = last.money_weighted_return
     return_tone = "positive" if money_weighted_return is not None and money_weighted_return > 0 else "negative" if money_weighted_return is not None and money_weighted_return < 0 else ""
