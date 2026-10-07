@@ -15,6 +15,7 @@ class PatrimonyPoint:
     investment_gain: Decimal
     invested_cost: Decimal = Decimal("0")
     market_value: Decimal = Decimal("0")
+    money_weighted_return: Decimal | None = None
 
 
 class PatrimonySeries:
@@ -30,6 +31,7 @@ class PatrimonySeries:
                 investment_gain=snapshot.investment_gain,
                 invested_cost=snapshot.invested_cost,
                 market_value=snapshot.market_value,
+                money_weighted_return=snapshot.money_weighted_return,
             )
             for snapshot in snapshots
         )
