@@ -107,4 +107,4 @@ def test_dashboard_v2_uses_total_pl_and_accumulated_return_for_accumulated_retur
     evolution = html.split('<div class="evolution-summary">', 1)[1].split("</div></section>", 1)[0]
     assert "Efectivo invertible" not in evolution
     assert "P/L total" in evolution
-    assert "Rendimiento acumulado" in evolution
+    assert "Rendimiento acumulado" not in evolution
