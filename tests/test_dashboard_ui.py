@@ -101,7 +101,8 @@ def test_dashboard_v2_uses_total_pl_and_accumulated_return_for_accumulated_retur
     assert "Rendimiento acumulado" in html
     assert "177,56 € · 8,88%" not in html
     assert '<strong class="positive">177,56 €</strong>' in html
-    assert '<strong class="positive">8,88%</strong>' in html
+    assert '<article class="metric positive"><div class="metric-label"><span>Rendimiento acumulado</span>' in html
+    assert '<strong>8,88%</strong>' in html
     assert "-1.034,44 €" not in html
     evolution = html.split('<div class="evolution-summary">', 1)[1].split("</div></section>", 1)[0]
     assert "Efectivo invertible" not in evolution
