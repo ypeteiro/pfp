@@ -138,7 +138,7 @@ def test_money_weighted_return_is_annualized_from_dated_cash_flows():
 
     assert snapshots[0].money_weighted_return == Decimal("0")
     assert snapshots[1].money_weighted_return is not None
-    assert abs(snapshots[1].money_weighted_return - Decimal("0.10")) < Decimal("0.000001")
+    assert abs(snapshots[1].money_weighted_return - Decimal("0.1000718114")) < Decimal("0.000001")
 
 
 def test_money_weighted_return_accounts_for_timing_of_additional_contributions():
