@@ -215,6 +215,18 @@ def test_sell_reduces_position_and_increases_cash():
     assert portfolio.cash == Decimal("3743.39")
 
 
+def test_sell_accepts_negative_shares_from_broker_import():
+    importer = TradeRepublicImporter()
+    movements = importer.load(CSV_FILE)
+    before = PortfolioEngine().build(movements)
+    sale = _sell_movement(shares="-0.1", amount="150", transaction_id="test-sell-negative")
+    movements.append(sale)
+    portfolio = PortfolioEngine().build(movements)
+    position = portfolio.positions["IE00B4L5Y983"]
+    assert position.shares == before.positions["IE00B4L5Y983"].shares - Decimal("0.1")
+    assert portfolio.cash == before.cash + Decimal("150")
+
+
 def test_sell_reduces_invested_at_average_cost():
     importer = TradeRepublicImporter()
     movements = importer.load(CSV_FILE)
