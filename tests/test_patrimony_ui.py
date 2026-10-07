@@ -13,7 +13,7 @@ def test_patrimony_evolution_view_shows_history_and_summary():
         CapitalFlow(datetime(2026, 3, 1), Decimal("100"), FlowType.WITHDRAWAL, "c"),
     ))
     html = patrimony_evolution_html(evolution)
-    for text in ("Evolución patrimonial", "Capital neto aportado", "Aportaciones", "Retiradas", "1.200,00 €", "100,00 €", "01/03/2026"):
+    for text in ("Evolución del capital aportado", "Capital neto aportado", "Aportaciones", "Retiradas", "1.200,00 €", "100,00 €", "01/03/2026"):
         assert text in html
 
 
