@@ -36,6 +36,26 @@ def test_workbook_writer_creates_full_workbook(tmp_path):
     assert workbook["Asignación"]["B2"].value == Decimal("0.75")
 
 
+def test_workbook_writer_uses_current_target_allocation(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "pfp.excel.workbook.load_target_allocation",
+        lambda: {
+            "EQUITY": Decimal("60"),
+            "FIXED_INCOME": Decimal("30"),
+            "GOLD": Decimal("10"),
+        },
+    )
+    output = tmp_path / "portfolio.xlsx"
+    WorkbookWriter().write(_report(), output)
+    workbook = load_workbook(output, data_only=False)
+
+    allocation = workbook["Asignación"]
+    assert allocation["B2"].value == Decimal("0.60")
+    assert allocation["B3"].value == Decimal("0.30")
+    assert allocation["B4"].value == Decimal("0.10")
+    assert allocation["B5"].value == Decimal("0")
+
+
 def test_workbook_writer_creates_parent_directory(tmp_path):
     output = tmp_path / "exports" / "portfolio.xlsx"
     result = WorkbookWriter().write(_report(), output)
