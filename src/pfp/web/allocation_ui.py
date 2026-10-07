@@ -3,16 +3,23 @@
 from decimal import Decimal
 from html import escape
 
+from pfp.config import load_target_allocation
 from pfp.excel.allocation_actions import AllocationRow, build_allocation_rows
 from pfp.reporting.portfolio_report import PortfolioReport
 
-TARGETS = {"RV": Decimal("0.75"), "RF": Decimal("0.20"), "GOLD": Decimal("0.05"), "CRYPTO": Decimal("0")}
-LABELS = {"RV": "Renta variable", "RF": "Renta fija", "GOLD": "Oro", "CRYPTO": "Cripto"}
+LABELS = {"EQUITY": "Renta variable", "FIXED_INCOME": "Renta fija", "GOLD": "Oro", "CRYPTO": "Cripto"}
 
 
 def allocation_html(report: PortfolioReport) -> str:
+    configured_targets = load_target_allocation()
+    targets = {
+        "RV": configured_targets.get("EQUITY", Decimal("0")) / Decimal("100"),
+        "RF": configured_targets.get("FIXED_INCOME", Decimal("0")) / Decimal("100"),
+        "GOLD": configured_targets.get("GOLD", Decimal("0")) / Decimal("100"),
+        "CRYPTO": configured_targets.get("CRYPTO", Decimal("0")) / Decimal("100"),
+    }
     values = {"RV": report.equity_value, "RF": report.fixed_income_value, "GOLD": report.gold_value, "CRYPTO": report.crypto_value}
-    rows = build_allocation_rows(values, TARGETS, report.market_value)
+    rows = build_allocation_rows(values, targets, report.market_value)
     total = report.market_value
     recommendation = _recommendation(rows, total)
     table_rows = "".join(_row(row, total) for row in rows)
