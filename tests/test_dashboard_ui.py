@@ -12,6 +12,7 @@ def test_dashboard_v2_shows_strategy_and_main_metrics():
         realized_gain_loss=Decimal("10"), unrealized_gain_loss=Decimal("20"),
         equity_value=Decimal("700"), fixed_income_value=Decimal("200"), gold_value=Decimal("100"), crypto_value=Decimal("0"),
         positions=(), accounts=(), movements=(),
+        patrimony_series=(PatrimonyPoint(datetime(2026, 3, 10), Decimal("1200"), Decimal("1100"), Decimal("100"), Decimal("1000"), Decimal("1000")),),
     )
     html = dashboard_v2_html(report)
     assert "Tu patrimonio" in html
@@ -21,6 +22,11 @@ def test_dashboard_v2_shows_strategy_and_main_metrics():
     assert "Aumentar" in html
     assert "1.200,00 €" in html
     assert "30,00 €" in html
+    assert "Patrimonio actual" in html
+    assert "Capital aportado" in html
+    assert "Valor de cartera" in html
+    assert "P/L total" in html
+    assert "Capital invertido" in html
 
 
 def test_dashboard_v2_colors_position_pnl_by_sign():
