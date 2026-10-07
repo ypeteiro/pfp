@@ -7,6 +7,7 @@ from openpyxl.chart import BarChart, PieChart, Reference
 from openpyxl.styles import Font, PatternFill
 from openpyxl.utils import get_column_letter
 
+from pfp.config import load_target_allocation
 from pfp.reporting.portfolio_report import PortfolioReport
 
 
@@ -134,7 +135,13 @@ class WorkbookWriter:
     def _write_allocation(workbook: Workbook, report: PortfolioReport) -> None:
         sheet = workbook.create_sheet("Asignación")
         WorkbookWriter._header(sheet, ["Clase", "Objetivo", "Valor actual", "% actual", "Desviación"])
-        targets = {"RV": Decimal("0.75"), "RF": Decimal("0.20"), "GOLD": Decimal("0.05"), "CRYPTO": Decimal("0")}
+        configured_targets = load_target_allocation()
+        targets = {
+            "RV": configured_targets.get("EQUITY", Decimal("0")) / Decimal("100"),
+            "RF": configured_targets.get("FIXED_INCOME", Decimal("0")) / Decimal("100"),
+            "GOLD": configured_targets.get("GOLD", Decimal("0")) / Decimal("100"),
+            "CRYPTO": configured_targets.get("CRYPTO", Decimal("0")) / Decimal("100"),
+        }
         values = {"RV": report.equity_value, "RF": report.fixed_income_value, "GOLD": report.gold_value, "CRYPTO": report.crypto_value}
         total = report.market_value
         for cls in ("RV", "RF", "GOLD", "CRYPTO"):
