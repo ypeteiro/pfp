@@ -6,6 +6,13 @@ from pfp.domain.position import Position
 from pfp.engine.rebalance_engine import RebalanceEngine
 
 
+TEST_TARGET_ALLOCATION = {
+    "EQUITY": Decimal("75"),
+    "FIXED_INCOME": Decimal("20"),
+    "GOLD": Decimal("5"),
+}
+
+
 def build_portfolio():
     portfolio = Portfolio(cash=Decimal("1000"))
     portfolio.positions = {
@@ -28,14 +35,18 @@ def build_portfolio():
     return portfolio
 
 
+def engine():
+    return RebalanceEngine(TEST_TARGET_ALLOCATION)
+
+
 def test_rebalance_total_value_includes_cash():
-    rebalance = RebalanceEngine().rebalance(build_portfolio())
+    rebalance = engine().rebalance(build_portfolio())
     assert rebalance.total_value == Decimal("19000")
     assert rebalance.rebalanceable_value == Decimal("19000")
 
 
 def test_rebalance_calculates_target_values():
-    rebalance = RebalanceEngine().rebalance(build_portfolio())
+    rebalance = engine().rebalance(build_portfolio())
     allocations = {item.portfolio_class: item for item in rebalance.allocations}
     assert allocations["EQUITY"].target_value == Decimal("14250")
     assert allocations["FIXED_INCOME"].target_value == Decimal("3800")
@@ -43,7 +54,7 @@ def test_rebalance_calculates_target_values():
 
 
 def test_rebalance_generates_buy_and_sell_orders():
-    rebalance = RebalanceEngine().rebalance(build_portfolio())
+    rebalance = engine().rebalance(build_portfolio())
     orders = {order.portfolio_class: order for order in rebalance.orders}
     assert orders["EQUITY"].action == "BUY"
     assert orders["EQUITY"].amount == Decimal("2250")
@@ -56,7 +67,7 @@ def test_rebalance_generates_buy_and_sell_orders():
 
 
 def test_rebalance_uses_existing_position_for_orders():
-    rebalance = RebalanceEngine().rebalance(build_portfolio())
+    rebalance = engine().rebalance(build_portfolio())
     assert {order.symbol for order in rebalance.orders} == {"EQUITY", "BOND", "GOLD"}
 
 
@@ -75,7 +86,7 @@ def test_rebalance_splits_large_sale_across_positions():
         ),
     }
 
-    rebalance = RebalanceEngine().rebalance(portfolio)
+    rebalance = RebalanceEngine(TEST_TARGET_ALLOCATION).rebalance(portfolio)
 
     sales = [order for order in rebalance.orders if order.portfolio_class == "FIXED_INCOME"]
     assert [(order.symbol, order.amount, order.shares) for order in sales] == [
@@ -92,7 +103,7 @@ def test_rebalance_excludes_non_rebalanceable_assets_from_target_allocation():
         invested=Decimal("100"), average_price=Decimal("100"),
         portfolio_class="CRYPTO", market_price=Decimal("500"),
     )
-    rebalance = RebalanceEngine().rebalance(portfolio)
+    rebalance = engine().rebalance(portfolio)
     assert rebalance.total_value == Decimal("19500")
     assert rebalance.rebalanceable_value == Decimal("19000")
     allocations = {item.portfolio_class: item for item in rebalance.allocations}
@@ -105,7 +116,7 @@ def test_rebalance_uses_average_price_when_market_price_is_missing():
     portfolio = build_portfolio()
     portfolio.positions["EQUITY"].market_price = None
 
-    rebalance = RebalanceEngine().rebalance(portfolio)
+    rebalance = engine().rebalance(portfolio)
 
     assert rebalance.total_value == Decimal("19000")
     assert rebalance.rebalanceable_value == Decimal("19000")
