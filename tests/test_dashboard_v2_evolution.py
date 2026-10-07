@@ -17,5 +17,6 @@ def test_dashboard_v2_shows_patrimony_evolution_from_historical_series():
         ),
     )
     html = dashboard_v2_html(report)
-    for text in ("Evolución patrimonial", "Patrimonio actual", "1.100,00 €", "Capital aportado", "Rendimiento acumulado", "01/02/2026"):
+    for text in ("Evolución del patrimonio", "Patrimonio actual", "1.100,00 €", "Capital aportado", "Rendimiento acumulado", "01/02/2026"):
         assert text in html
+    assert "Evolución patrimonial" not in html
