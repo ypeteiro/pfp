@@ -147,7 +147,7 @@ class PatrimonyHistory:
                     market_value=market_value,
                     patrimony=patrimony,
                     cumulative_contributed=cumulative_contributed,
-                    investment_gain=patrimony - opening_cash - cumulative_contributed,
+                    investment_gain=(\n                        patrimony - opening_cash - cumulative_contributed\n                        if uses_raw_movements\n                        else patrimony - cumulative_contributed\n                    ),
                 )
             )
 
