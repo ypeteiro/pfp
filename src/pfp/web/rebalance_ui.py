@@ -40,9 +40,10 @@ def rebalance_html(portfolio, account_id: str | None = None) -> str:
 </section>
 <div class="metric-grid">
 <div class="metric"><div class="metric-label">Cuenta seleccionada</div><strong>{escape(selected)}</strong></div>
-<div class="metric"><div class="metric-label">Valor rebalanceable</div><strong>{_money(result.rebalanceable_value)}</strong></div>
+<div class="metric" title="Efectivo y posiciones de la cuenta seleccionada que pertenecen a las clases objetivo de la cartera."><div class="metric-label">Valor rebalanceable</div><strong>{_money(result.rebalanceable_value)}</strong></div>
 <div class="metric"><div class="metric-label">Órdenes</div><strong>{len(result.orders)}</strong></div>
-<div class="metric"><div class="metric-label">Valor total cartera</div><strong>{_money(result.total_value)}</strong></div>
+<div class="metric" title="Valor de toda la cartera, incluidos los activos que no forman parte de las clases objetivo del rebalanceo."><div class="metric-label">Valor total cartera</div><strong>{_money(result.total_value)}</strong></div>
 </div>
+<p class="muted rebalance-explanation">Las ponderaciones objetivo y las órdenes propuestas se calculan sobre el <strong>valor rebalanceable</strong>, no sobre el valor total de la cartera. Los activos fuera de las clases objetivo quedan fuera del rebalanceo.</p>
 <section class="panel"><div class="panel-heading"><h2>Órdenes propuestas</h2><span>Solo vista previa</span></div><div class="table-scroll"><table><thead><tr><th>Acción</th><th>Activo</th><th>Clase</th><th>Importe</th><th>Participaciones</th></tr></thead><tbody>{rows}</tbody></table></div></section>
 </div>'''
