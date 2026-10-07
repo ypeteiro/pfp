@@ -78,12 +78,8 @@ class PatrimonyHistory:
 
         engine = PortfolioEngine()
         historical_portfolio = engine.initialize_incremental(ordered_movements) if uses_raw_movements else None
-        movement_index = investment_index = sales_index = 0
+        movement_index = investment_index = sales_index = external_index = 0
 
-        # Keep the non-raw reconstruction state alive across dates. The previous
-        # optimized version recreated holdings on every snapshot while keeping
-        # the investment/sale cursors advanced, which lost positions after the
-        # date on which they were first applied.
         nonraw_cash = opening_cash
         nonraw_holdings: dict[str, Decimal] = {}
         nonraw_invested = Decimal("0")
@@ -122,14 +118,11 @@ class PatrimonyHistory:
                     sale = ordered_sales[sales_index]
                     nonraw_cash += sale.amount
                     nonraw_holdings[sale.symbol] = nonraw_holdings.get(sale.symbol, Decimal("0")) - abs(Decimal(str(sale.shares)))
-                    # invested_cost is the remaining cost basis. Without a full
-                    # position engine here, a sale at the recorded amount is the
-                    # historical convention already used by this reconstruction.
                     nonraw_invested -= sale.amount
                     sales_index += 1
-                for movement in ordered_external:
-                    if _normalize_datetime(movement.datetime) <= date:
-                        nonraw_cash += movement.amount
+                while external_index < len(ordered_external) and _normalize_datetime(ordered_external[external_index].datetime) <= date:
+                    nonraw_cash += ordered_external[external_index].amount
+                    external_index += 1
                 cash = nonraw_cash
                 invested_cost = nonraw_invested
                 holdings = nonraw_holdings
