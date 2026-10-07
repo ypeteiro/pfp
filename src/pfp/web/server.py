@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import json
 from decimal import Decimal, InvalidOperation
@@ -176,6 +176,10 @@ class WebRuntime:
     external_cash_movement_repository: ExternalCashMovementRepository | None = None
     account_transfer_repository: AccountTransferRepository | None = None
     historical_price_provider: object | None = None
+    _report_cache: PortfolioReport | None = field(default=None, init=False, repr=False)
+
+    def _invalidate_report(self) -> None:
+        self._report_cache = None
 
     def register_investment(self, request: RegisterInvestmentRequest):
         if self.investment_repository is None:
@@ -184,6 +188,7 @@ class WebRuntime:
             raise ValueError(f"La operación «{request.operation_id}» ya ha sido registrada")
         investment = RegisterInvestment().execute(self.portfolio, request)
         self.investment_repository.save(investment)
+        self._invalidate_report()
         return investment
 
     def register_sale(self, request: RegisterSaleRequest):
@@ -193,6 +198,7 @@ class WebRuntime:
             raise ValueError(f"La operación «{request.operation_id}» ya ha sido registrada")
         sale = RegisterSale().execute(self.portfolio, request)
         self.sale_repository.save(sale)
+        self._invalidate_report()
         return sale
 
     def register_asset(self, asset: Asset):
@@ -200,6 +206,7 @@ class WebRuntime:
             raise RuntimeError("Asset repository is not configured")
         AssetCatalog.register(asset)
         self.asset_repository.save(asset)
+        self._invalidate_report()
         return asset
 
     def register_external_cash_movement(self, request: RegisterExternalCashMovementRequest):
@@ -207,16 +214,20 @@ class WebRuntime:
             raise RuntimeError("External cash movement repository is not configured")
         movement = RegisterExternalCashMovement().execute(self.portfolio, request)
         self.external_cash_movement_repository.save(movement)
+        self._invalidate_report()
         return movement
 
     def register_account_transfer(self, request: RegisterAccountTransferRequest):
         if self.account_transfer_repository is None:
-            raise RuntimeError("Account transfer repository is not configured")
+            raise RuntimeError("Transfer repository is not configured")
         transfer = RegisterAccountTransfer().execute(self.portfolio, request)
         self.account_transfer_repository.save(transfer)
+        self._invalidate_report()
         return transfer
 
     def report(self) -> PortfolioReport:
+        if self._report_cache is not None:
+            return self._report_cache
         _value_portfolio(self.portfolio, self.price_provider)
         investments = self.investment_repository.load() if self.investment_repository is not None else ()
         sales = self.sale_repository.load() if self.sale_repository is not None else ()
@@ -243,11 +254,12 @@ class WebRuntime:
             historical_provider,
             trade_republic_movements,
         )
-        return PortfolioReport.from_portfolio(
+        self._report_cache = PortfolioReport.from_portfolio(
             self.portfolio,
             price_consulted_at=datetime.now().astimezone(),
             patrimony_series=patrimony_series,
         )
+        return self._report_cache
 
 
 def build_web_runtime(
@@ -490,6 +502,10 @@ def serve(
                     runtime.register_asset(parse_asset_request(form))
                 elif self.path == "/targets":
                     save_target_allocation(parse_target_allocation_request(form))
+                    self.send_response(303)
+                    self.send_header("Location", "/targets")
+                    self.end_headers()
+                    return
                 elif self.path == "/accounts/adjust":
                     account_id, target_balance, when, description = parse_account_adjustment_request(form)
                     account = next((item for item in runtime.portfolio.accounts if item.id == account_id), None)
