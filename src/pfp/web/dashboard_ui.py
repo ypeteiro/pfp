@@ -53,14 +53,14 @@ def dashboard_v2_html(report: PortfolioReport, sort: str = "weight", direction: 
     contributed = report.patrimony_series[-1].cumulative_contributed if report.patrimony_series else Decimal("0")
     accumulated_return = total_pl / contributed if contributed != 0 else None
     return_tone = "positive" if total_pl > 0 else "negative" if total_pl < 0 else ""
-    evolution_html = _evolution_summary(_evolution_from_report(report), report.patrimony_series, total_pl, report.investable_cash)
+    evolution_html = _evolution_summary(_evolution_from_report(report), report.patrimony_series, total_pl)
     consulted_at = report.price_consulted_at or datetime.now().astimezone()
     consulted = consulted_at.strftime("%d/%m/%Y %H:%M")
     price_status = f'<p class="price-status">Precios de mercado consultados: {consulted}</p>'
     return f"""
 <section class="dashboard-v2">
   <div class="hero"><div><h1>Tu patrimonio</h1><p class="muted">Una lectura rápida de dónde está tu dinero y cómo se desvía de tu estrategia.</p>{price_status}</div></div>
-  <section class="metric-grid">{metric("Patrimonio total", report.total_value)}{metric("Rendimiento acumulado", accumulated_return or Decimal("0"), return_tone, value_is_percent=True)}{metric("Efectivo invertible", report.investable_cash)}{metric("Cartera invertida", report.market_value)}{metric("P/L realizado", report.realized_gain_loss)}{metric("P/L no realizado", report.unrealized_gain_loss)}{metric("P/L total", total_pl, "positive" if total_pl >= 0 else "negative")}</section>
+  <section class="metric-grid">{metric("Patrimonio total", report.total_value)}{metric("Efectivo", report.cash)}{metric("Efectivo invertible", report.investable_cash)}{metric("Cartera invertida", report.market_value)}{metric("P/L realizado", report.realized_gain_loss)}{metric("P/L no realizado", report.unrealized_gain_loss)}{metric("P/L total", total_pl, "positive" if total_pl >= 0 else "negative")}{metric("Rendimiento acumulado", accumulated_return or Decimal("0"), return_tone, value_is_percent=True)}</section>
   {evolution_html}
   <section class="two-col"><article class="panel"><div class="panel-heading allocation-panel-heading"><h2>Asignación {tooltip("Distribución actual de tu patrimonio por clase de activo.")}</h2><span>Objetivo {pct(targets["RV"])} / {pct(targets["RF"])} / {pct(targets["Oro"])} / {pct(targets["Cripto"])}</span></div>{''.join(bars)}</article><article class="panel"><div class="panel-heading"><h2>Posiciones principales</h2><span>{len(report.positions)} activos</span></div><table><thead><tr>{sort_heading("Activo", "symbol", sort, direction)}{sort_heading("Nombre", "name", sort, direction)}{sort_heading("Peso", "weight", sort, direction)}{sort_heading("Valor", "value", sort, direction)}<th>P/L</th></tr></thead><tbody>{position_rows or '<tr><td colspan="5">Sin posiciones</td></tr>'}</tbody></table></article></section>
 </section>
@@ -90,7 +90,7 @@ def _evolution_from_report(report: PortfolioReport) -> PatrimonyEvolution:
     )
 
 
-def _evolution_summary(evolution: PatrimonyEvolution, points: tuple[PatrimonyPoint, ...], total_pl: Decimal, cash: Decimal) -> str:
+def _evolution_summary(evolution: PatrimonyEvolution, points: tuple[PatrimonyPoint, ...], total_pl: Decimal) -> str:
     if not points:
         return '<section class="panel patrimony-evolution"><div class="panel-heading"><h2>Evolución patrimonial</h2></div><p class="muted">Todavía no hay suficientes datos históricos para mostrar la evolución.</p></section>'
 
@@ -157,7 +157,7 @@ def _evolution_summary(evolution: PatrimonyEvolution, points: tuple[PatrimonyPoi
     svg = f'<svg class="patrimony-chart" viewBox="0 0 {width} {height}" role="img" aria-label="Evolución temporal del patrimonio, capital aportado y capital invertido" style="width:100%;height:auto;display:block"><g>{"".join(ticks)}</g><g>{"".join(date_labels)}</g><g>{"".join(lines)}</g><g>{"".join(points_svg)}</g><g>{"".join(end_labels)}</g></svg>'
     legend = '<div style="display:flex;flex-wrap:wrap;gap:18px;margin:10px 0 16px;font-size:13px"><span style="color:#2563eb;font-weight:600">━━ Patrimonio</span><span style="color:#64748b;font-weight:600">┄┄ Capital aportado</span><span style="color:#059669;font-weight:600">··· Capital invertido</span></div>'
 
-    return f'<section class="panel patrimony-evolution"><div class="panel-heading"><div><h2>Evolución patrimonial {tooltip("Patrimonio = efectivo + valor de mercado. Capital aportado = aportaciones netas. Capital invertido = coste de las posiciones.")}</h2><p class="muted evolution-description">La línea continua es tu patrimonio. La discontinua es lo que has aportado. La punteada es el capital destinado a comprar tus inversiones.</p></div><span>{len(points)} puntos históricos</span></div>{svg}{legend}<div class="evolution-summary"><div><span>Patrimonio actual</span><strong>{euro(last.patrimony)}</strong><small>Rendimiento acumulado</small><strong class="{return_tone}">{euro(total_pl)} · {pct(accumulated_return)}</strong></div><div><span>Efectivo invertible</span><strong>{euro(cash)}</strong></div><div><span>Capital aportado</span><strong>{euro(last.cumulative_contributed)}</strong></div><div><span>Capital invertido</span><strong>{euro(last.invested_cost)}</strong></div></div></section>'
+    return f'<section class="panel patrimony-evolution"><div class="panel-heading"><div><h2>Evolución patrimonial {tooltip("Patrimonio = efectivo + valor de mercado. Capital aportado = aportaciones netas. Capital invertido = coste de las posiciones.")}</h2><p class="muted evolution-description">La línea continua es tu patrimonio. La discontinua es lo que has aportado. La punteada es el capital destinado a comprar tus inversiones.</p></div><span>{len(points)} puntos históricos</span></div>{svg}{legend}<div class="evolution-summary"><div><span>Patrimonio actual</span><strong>{euro(last.patrimony)}</strong></div><div><span>P/L total</span><strong class="{return_tone}">{euro(total_pl)}</strong></div><div><span>Rendimiento acumulado</span><strong class="{return_tone}">{pct(accumulated_return)}</strong></div><div><span>Capital aportado</span><strong>{euro(last.cumulative_contributed)}</strong></div><div><span>Capital invertido</span><strong>{euro(last.invested_cost)}</strong></div></div></section>'
 
 
 def metric(label: str, value: Decimal, tone: str = "", detail: str = "", value_is_percent: bool = False) -> str:
