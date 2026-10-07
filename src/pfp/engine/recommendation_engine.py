@@ -39,7 +39,7 @@ class RecommendationEngine:
         self.target_allocation = (
             target_allocation.copy()
             if target_allocation is not None
-            else TARGET_ALLOCATION.copy()
+            else load_target_allocation()
         )
 
     def recommend(self, portfolio, amount):
