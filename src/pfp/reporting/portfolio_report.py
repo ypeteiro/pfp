@@ -3,6 +3,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from pfp.domain.account_catalog import DEFAULT_ACCOUNT_CATALOG
+from pfp.domain.asset import LONG_TERM, TACTICAL
 from pfp.domain.asset_catalog import AssetCatalog
 from pfp.domain.portfolio import Portfolio
 from pfp.reporting.patrimony_series import PatrimonyPoint
@@ -22,6 +23,7 @@ class PositionReport:
     gain_loss: Decimal | None
     isin: str | None = None
     ticker: str | None = None
+    investment_strategy: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -82,6 +84,14 @@ class PortfolioReport:
     def security_fund_cash(self) -> Decimal:
         return sum((account.balance for account in self.accounts if not account.is_investable), Decimal("0"))
 
+    @property
+    def long_term_equity_value(self) -> Decimal:
+        return sum((position.market_value or Decimal("0") for position in self.positions if position.portfolio_class == "RV" and position.investment_strategy == LONG_TERM), Decimal("0"))
+
+    @property
+    def tactical_equity_value(self) -> Decimal:
+        return sum((position.market_value or Decimal("0") for position in self.positions if position.portfolio_class == "RV" and position.investment_strategy == TACTICAL), Decimal("0"))
+
     @classmethod
     def from_portfolio(cls, portfolio: Portfolio, price_consulted_at: datetime | None = None, patrimony_series: tuple[PatrimonyPoint, ...] = ()) -> "PortfolioReport":
         market_value = sum((position.market_value or Decimal("0") for position in portfolio.positions.values()), Decimal("0"))
@@ -112,6 +122,7 @@ class PortfolioReport:
                 gain_loss=gain_loss,
                 isin=asset.isin if asset else (position.symbol if position.symbol.upper().startswith(("IE", "US")) else None),
                 ticker=asset.ticker if asset else (position.symbol if not position.symbol.upper().startswith(("IE", "US")) else None),
+                investment_strategy=asset.investment_strategy if asset else (TACTICAL if position.portfolio_class == "STOCK" else LONG_TERM),
             ))
 
         account_reports = []
