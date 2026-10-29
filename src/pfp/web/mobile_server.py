@@ -16,6 +16,7 @@ from pfp.web.server import serve
 PACKAGE_DIR = Path(__file__).resolve().parent
 MANIFEST_FILE = PACKAGE_DIR / "manifest.webmanifest"
 SERVICE_WORKER_FILE = PACKAGE_DIR / "sw.js"
+PWA_ICON_FILE = PACKAGE_DIR / "pwa-icon.svg"
 
 
 def _inject_pwa(html: bytes) -> bytes:
@@ -112,6 +113,9 @@ def main() -> None:
                 return
             if self.path == "/sw.js":
                 _serve_file(self, SERVICE_WORKER_FILE, "application/javascript; charset=utf-8")
+                return
+            if self.path == "/pwa-icon.svg":
+                _serve_file(self, PWA_ICON_FILE, "image/svg+xml")
                 return
             self._proxy()
 
