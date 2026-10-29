@@ -1,4 +1,4 @@
-from pfp.domain.asset import Asset
+from pfp.domain.asset import Asset, LONG_TERM, TACTICAL
 
 
 class AssetCatalog:
@@ -10,11 +10,11 @@ class AssetCatalog:
         "IE00B4L5Y983": Asset(symbol="IE00B4L5Y983", name="iShares Core MSCI World UCITS ETF USD (Acc)", portfolio_class="EQUITY", isin="IE00B4L5Y983", ticker="EUNL"),
         "IE00B5BMR087": Asset(symbol="IE00B5BMR087", name="iShares Core S&P 500 UCITS ETF USD (Acc)", portfolio_class="EQUITY", isin="IE00B5BMR087", ticker="SXR8"),
         "IE000I1Q42S9": Asset(symbol="IE000I1Q42S9", name="Fixed Income 2027", portfolio_class="FIXED_INCOME", isin="IE000I1Q42S9"),
-        "IE00BK5BQT80": Asset(symbol="IE00BK5BQT80", name="Vanguard FTSE All-World UCITS ETF USD (Acc)", portfolio_class="EQUITY", isin="IE00BK5BQT80", ticker="VWCE"),
+        "IE00BK5BQT80": Asset(symbol="IE00BK5BQT80", name="Vanguard FTSE All-World UCITS ETF USD (Acc)", portfolio_class="EQUITY", isin="IE00BK5BQT80", ticker="VWCE", investment_strategy=LONG_TERM),
         "IE00BG47KH54": Asset(symbol="IE00BG47KH54", name="Vanguard Global Aggregate Bond UCITS ETF EUR Hedged Acc", portfolio_class="FIXED_INCOME", isin="IE00BG47KH54", ticker="VAGF"),
         "IE00B4ND3602": Asset(symbol="IE00B4ND3602", name="Gold", portfolio_class="GOLD", isin="IE00B4ND3602"),
-        "US55024U1097": Asset(symbol="US55024U1097", name="Lumentum Holdings", portfolio_class="STOCK", isin="US55024U1097", ticker="LITE"),
-        "US1717793095": Asset(symbol="US1717793095", name="Ciena", portfolio_class="STOCK", isin="US1717793095", ticker="CIEN"),
+        "US55024U1097": Asset(symbol="US55024U1097", name="Lumentum Holdings", portfolio_class="STOCK", isin="US55024U1097", ticker="LITE", investment_strategy=TACTICAL),
+        "US1717793095": Asset(symbol="US1717793095", name="Ciena", portfolio_class="STOCK", isin="US1717793095", ticker="CIEN", investment_strategy=TACTICAL),
     }
 
     @classmethod
@@ -41,6 +41,7 @@ class AssetCatalog:
         portfolio_class: str | None = None,
         isin: str | None = None,
         ticker: str | None = None,
+        investment_strategy: str | None = None,
     ) -> Asset:
         asset = cls.get(symbol)
         if asset is not None:
@@ -51,5 +52,6 @@ class AssetCatalog:
             portfolio_class=portfolio_class or "UNKNOWN",
             isin=isin or (symbol.strip() if symbol.upper().startswith(("IE", "US")) else None),
             ticker=ticker,
+            investment_strategy=investment_strategy,
         )
         return cls.register(asset)
