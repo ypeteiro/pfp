@@ -5,6 +5,7 @@ from decimal import Decimal
 from html import escape
 
 from pfp.config import load_target_allocation
+from pfp.domain.asset import LONG_TERM, TACTICAL
 from pfp.domain.capital_flow import CapitalFlow, FlowType
 from pfp.excel.allocation_actions import build_allocation_rows
 from pfp.importers.trade_republic import TradeRepublicImporter
@@ -49,8 +50,19 @@ def dashboard_v2_html(report: PortfolioReport, sort: str = "weight", direction: 
         weight = max(0, min(100, float(row.current_weight * 100))) if row.current_weight is not None else 0
         bars.append('<div class="allocation-row">' f'<div class="allocation-label"><span class="allocation-name">{escape(label)} {tooltip(tip)}</span><strong>{pct(row.current_weight)}</strong></div>' f'<div class="bar"><span style="width:{weight:.2f}%"></span></div>' f'<div class="allocation-meta">Objetivo {pct(row.target)} · {escape(row.action)}</div>' '</div>')
 
+    equity_total = report.equity_value
+    long_term_weight = report.long_term_equity_value / equity_total if equity_total else None
+    tactical_weight = report.tactical_equity_value / equity_total if equity_total else None
+    tactical_total_weight = report.tactical_equity_value / report.total_value if report.total_value else None
+    equity_strategy_html = (
+        f'<div class="allocation-row"><div class="allocation-label"><span class="allocation-name">Largo plazo {tooltip("Renta variable destinada a mantener a largo plazo, como VWCE.")}</span><strong>{pct(long_term_weight)}</strong></div>'
+        f'<div class="bar"><span style="width:{float(long_term_weight * 100) if long_term_weight is not None else 0:.2f}%"></span></div><div class="allocation-meta">{euro(report.long_term_equity_value)} · dentro de la renta variable</div></div>'
+        f'<div class="allocation-row"><div class="allocation-label"><span class="allocation-name">Corto plazo / táctico {tooltip("Renta variable destinada a operaciones más arriesgadas y con un horizonte de venta más corto.")}</span><strong>{pct(tactical_weight)}</strong></div>'
+        f'<div class="bar"><span style="width:{float(tactical_weight * 100) if tactical_weight is not None else 0:.2f}%"></span></div><div class="allocation-meta">{euro(report.tactical_equity_value)} · {pct(tactical_total_weight)} del patrimonio total</div></div>'
+    )
+
     positions = sort_positions(report, sort, direction)
-    position_rows = "".join(f'<tr><td>{escape(p.ticker or p.isin or p.symbol)}</td><td>{escape(p.name)}</td><td>{pct(p.weight)}</td><td>{euro(p.market_value)}</td><td class="{"positive" if p.gain_loss is not None and p.gain_loss > 0 else "negative" if p.gain_loss is not None and p.gain_loss < 0 else ""}">{euro(p.gain_loss)}</td></tr>' for p in positions[:10])
+    position_rows = "".join(f'<tr><td>{escape(p.ticker or p.isin or p.symbol)}</td><td>{escape(p.name)}</td><td>{strategy_label(p.investment_strategy)}</td><td>{pct(p.weight)}</td><td>{euro(p.market_value)}</td><td class="{"positive" if p.gain_loss is not None and p.gain_loss > 0 else "negative" if p.gain_loss is not None and p.gain_loss < 0 else ""}">{euro(p.gain_loss)}</td></tr>' for p in positions[:10])
     total_pl = report.realized_gain_loss + report.unrealized_gain_loss
     contributed = report.patrimony_series[-1].cumulative_contributed if report.patrimony_series else Decimal("0")
     accumulated_return = total_pl / contributed if contributed != 0 else None
@@ -64,7 +76,7 @@ def dashboard_v2_html(report: PortfolioReport, sort: str = "weight", direction: 
   <div class="hero"><div><h1>Tu patrimonio</h1><p class="muted">Una lectura rápida de dónde está tu dinero y cómo se desvía de tu estrategia.</p>{price_status}</div></div>
   <section class="metric-grid">{metric("Patrimonio total", report.total_value)}{metric("Efectivo", report.cash)}{metric("Efectivo invertible", report.investable_cash)}{metric("Cartera invertida", report.market_value)}{metric("P/L realizado", report.realized_gain_loss)}{metric("P/L no realizado", report.unrealized_gain_loss)}{metric("P/L total", total_pl, "positive" if total_pl >= 0 else "negative")}{metric("Rendimiento acumulado", accumulated_return or Decimal("0"), return_tone, value_is_percent=True)}</section>
   {evolution_html}
-  <section class="two-col"><article class="panel"><div class="panel-heading allocation-panel-heading"><h2>Asignación {tooltip("Distribución actual de tu patrimonio por clase de activo.")}</h2><span>Objetivo {pct(targets["RV"])} / {pct(targets["RF"])} / {pct(targets["Oro"])} / {pct(targets["Cripto"])}</span></div>{''.join(bars)}</article><article class="panel"><div class="panel-heading"><h2>Posiciones principales</h2><span>{len(report.positions)} activos</span></div><table><thead><tr>{sort_heading("Activo", "symbol", sort, direction)}{sort_heading("Nombre", "name", sort, direction)}{sort_heading("Peso", "weight", sort, direction)}{sort_heading("Valor", "value", sort, direction)}<th>P/L</th></tr></thead><tbody>{position_rows or '<tr><td colspan="5">Sin posiciones</td></tr>'}</tbody></table></article></section>
+  <section class="two-col"><article class="panel"><div class="panel-heading allocation-panel-heading"><h2>Asignación {tooltip("Distribución actual de tu patrimonio por clase de activo.")}</h2><span>Objetivo {pct(targets["RV"])} / {pct(targets["RF"])} / {pct(targets["Oro"])} / {pct(targets["Cripto"])}</span></div>{''.join(bars)}<div class="allocation-subsection"><h3>Renta variable: largo vs corto plazo</h3><p class="muted">Permite controlar cuánto riesgo táctico estás asumiendo dentro de la renta variable.</p>{equity_strategy_html}</div></article><article class="panel"><div class="panel-heading"><h2>Posiciones principales</h2><span>{len(report.positions)} activos</span></div><table><thead><tr>{sort_heading("Activo", "symbol", sort, direction)}{sort_heading("Nombre", "name", sort, direction)}<th>Estrategia</th>{sort_heading("Peso", "weight", sort, direction)}{sort_heading("Valor", "value", sort, direction)}<th>P/L</th></tr></thead><tbody>{position_rows or '<tr><td colspan="6">Sin posiciones</td></tr>'}</tbody></table></article></section>
 </section>
 """
 
@@ -84,6 +96,14 @@ def sort_heading(label: str, field: str, current: str, direction: str) -> str:
     next_direction = "asc" if current == field and direction != "asc" else "desc"
     arrow = "↑" if current == field and direction == "asc" else "↓" if current == field else "↕"
     return f'<th><a class="sortable-heading" href="/?sort={field}&direction={next_direction}">{label}<span class="sort-arrow">{arrow}</span></a></th>'
+
+
+def strategy_label(strategy: str | None) -> str:
+    if strategy == TACTICAL:
+        return '<span class="strategy tactical">Corto plazo</span>'
+    if strategy == LONG_TERM:
+        return '<span class="strategy long-term">Largo plazo</span>'
+    return "—"
 
 
 def _evolution_from_report(report: PortfolioReport) -> PatrimonyEvolution:
