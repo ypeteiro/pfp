@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import ssl
 from http.client import RemoteDisconnected
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -53,7 +54,13 @@ def main() -> None:
     parser.add_argument("--assets-file", default="data/assets.csv")
     parser.add_argument("--reconciliations-file", default="data/accounts/reconciliation_history.csv")
     parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument("--https", action="store_true", help="Serve the mobile endpoint over HTTPS")
+    parser.add_argument("--certfile", help="TLS certificate PEM file (required with --https)")
+    parser.add_argument("--keyfile", help="TLS private key PEM file (required with --https)")
     args = parser.parse_args()
+
+    if args.https and (not args.certfile or not args.keyfile):
+        parser.error("--https requiere --certfile y --keyfile")
 
     backend_port = args.port + 1
     Thread(
@@ -125,7 +132,16 @@ def main() -> None:
         def log_message(self, format: str, *args) -> None:
             return
 
-    ThreadingHTTPServer(("0.0.0.0", args.port), MobileHandler).serve_forever()
+    httpd = ThreadingHTTPServer(("0.0.0.0", args.port), MobileHandler)
+    if args.https:
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.load_cert_chain(args.certfile, args.keyfile)
+        httpd.socket = context.wrap_socket(httpd.socket, server_side=True)
+        scheme = "https"
+    else:
+        scheme = "http"
+    print(f"PFP móvil disponible en {scheme}://0.0.0.0:{args.port}")
+    httpd.serve_forever()
 
 
 if __name__ == "__main__":
