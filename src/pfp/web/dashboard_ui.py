@@ -108,10 +108,11 @@ def _allocation_carousel(report: PortfolioReport, bars: list[str], equity_strate
     for label, value, color, tip in pie_data:
         weight = value / pie_total if pie_total else None
         legend.append(
-            f'<div class="allocation-pie-item"><span class="allocation-pie-dot" style="background:{color}"></span>'
-            f'<div><div class="allocation-pie-name">{escape(label)} {tooltip(tip)}</div>'
+            f'<div style="display:flex;align-items:flex-start;gap:9px;margin-bottom:11px"><span style="width:10px;height:10px;border-radius:50%;background:{color};margin-top:5px;flex:0 0 10px"></span>'
+            f'<div><div style="font-weight:600">{escape(label)} {tooltip(tip)}</div>'
             f'<strong>{pct(weight)}</strong><span class="allocation-pie-value"> · {euro(value)}</span></div></div>'
         )
+    pie_aria = "; ".join(f"{label}: {pct(value / pie_total) if pie_total else '0,00%'}" for label, value, _, _ in pie_data)
 
     first_slide = (
         '<div class="allocation-slide" data-chart-slide="0">'
@@ -129,17 +130,17 @@ def _allocation_carousel(report: PortfolioReport, bars: list[str], equity_strate
         '<div class="panel-heading allocation-panel-heading"><div>'
         f'<h2>Distribución del dinero total {tooltip("Porcentaje de todo tu patrimonio actual, incluyendo el efectivo.")}</h2>'
         '<span>100% del patrimonio</span></div><span class="allocation-chart-title">Composición actual</span></div>'
-        '<div class="allocation-pie-layout">'
-        f'<div class="allocation-pie" role="img" aria-label="Distribución del dinero total: {escape("; ".join(f"{label}: {pct(value / pie_total) if pie_total else "0,00%"}" for label, value, _, _ in pie_data))}" style="background:{pie_gradient}"><div class="allocation-pie-hole"><strong>{euro(pie_total)}</strong><span>patrimonio total</span></div></div>'
-        f'<div class="allocation-pie-legend">{"".join(legend)}</div>'
+        '<div style="display:flex;align-items:center;justify-content:center;gap:34px;flex-wrap:wrap;padding:12px 0 6px">'
+        f'<div role="img" aria-label="Distribución del dinero total: {escape(pie_aria)}" style="width:250px;height:250px;border-radius:50%;background:{pie_gradient};display:grid;place-items:center;flex:0 0 250px"><div style="width:112px;height:112px;border-radius:50%;background:var(--panel-bg,white);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;box-sizing:border-box"><strong style="font-size:18px">{euro(pie_total)}</strong><span class="muted" style="font-size:11px">patrimonio total</span></div></div>'
+        f'<div style="min-width:220px;flex:1">{"".join(legend)}</div>'
         '</div></div>'
     )
     return (
         '<div class="allocation-carousel" data-chart-carousel>'
-        '<div class="allocation-carousel-controls">'
-        '<button type="button" class="allocation-carousel-button" data-chart-prev aria-label="Gráfico anterior">‹</button>'
-        '<span class="allocation-carousel-position" data-chart-position>1 / 2</span>'
-        '<button type="button" class="allocation-carousel-button" data-chart-next aria-label="Gráfico siguiente">›</button>'
+        '<div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:14px">'
+        '<button type="button" style="border:1px solid #cbd5e1;background:transparent;border-radius:7px;width:34px;height:32px;font-size:20px;cursor:pointer" data-chart-prev aria-label="Gráfico anterior">‹</button>'
+        '<span style="font-size:13px;font-weight:600;min-width:42px;text-align:center" data-chart-position>1 / 2</span>'
+        '<button type="button" style="border:1px solid #cbd5e1;background:transparent;border-radius:7px;width:34px;height:32px;font-size:20px;cursor:pointer" data-chart-next aria-label="Gráfico siguiente">›</button>'
         '</div>'
         f'<div class="allocation-carousel-viewport">{first_slide}{second_slide}</div>'
         '<script>(function(){const root=document.currentScript.closest("[data-chart-carousel]");if(!root)return;const slides=[...root.querySelectorAll("[data-chart-slide]")];const position=root.querySelector("[data-chart-position]");let index=0;function show(next){index=(next+slides.length)%slides.length;slides.forEach((slide,i)=>{slide.hidden=i!==index});position.textContent=(index+1)+" / "+slides.length;}root.querySelector("[data-chart-prev]").addEventListener("click",()=>show(index-1));root.querySelector("[data-chart-next]").addEventListener("click",()=>show(index+1));show(0);})();</script>'
