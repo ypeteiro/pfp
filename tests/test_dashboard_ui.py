@@ -110,3 +110,57 @@ def test_dashboard_v2_uses_total_pl_and_accumulated_return_for_accumulated_retur
     assert "Efectivo invertible" not in evolution
     assert "P/L total" in evolution
     assert "Rendimiento acumulado" not in evolution
+
+
+def test_dashboard_v2_allocation_chart_carousel_shows_existing_chart_first():
+    report = PortfolioReport(
+        cash=Decimal("200"), invested=Decimal("1000"), market_value=Decimal("1000"), total_value=Decimal("1200"),
+        realized_gain_loss=Decimal("0"), unrealized_gain_loss=Decimal("0"),
+        equity_value=Decimal("700"), fixed_income_value=Decimal("200"), gold_value=Decimal("100"), crypto_value=Decimal("0"),
+        positions=(), accounts=(), movements=(),
+    )
+
+    html = dashboard_v2_html(report)
+
+    assert 'data-chart-carousel' in html
+    assert 'data-chart-slide="0"' in html
+    assert 'data-chart-slide="1" hidden' in html
+    assert 'data-chart-prev' in html
+    assert 'data-chart-next' in html
+    assert 'data-chart-position>1 / 2<' in html
+    assert 'Asignación actual' in html
+    assert 'Distribución del dinero total' in html
+
+
+def test_dashboard_v2_total_money_pie_splits_equity_by_long_and_short_term():
+    positions = (
+        PositionReport(
+            "VWCE", "Vanguard FTSE All-World", "RV", Decimal("4"), Decimal("350"), Decimal("87.5"),
+            Decimal("100"), Decimal("400"), Decimal("0.4"), Decimal("50"), investment_strategy="LONG_TERM",
+        ),
+        PositionReport(
+            "VIS", "Vistra", "RV", Decimal("3"), Decimal("250"), Decimal("83.33"),
+            Decimal("100"), Decimal("300"), Decimal("0.3"), Decimal("50"), investment_strategy="TACTICAL",
+        ),
+    )
+    report = PortfolioReport(
+        cash=Decimal("200"), invested=Decimal("1000"), market_value=Decimal("1000"), total_value=Decimal("1200"),
+        realized_gain_loss=Decimal("0"), unrealized_gain_loss=Decimal("100"),
+        equity_value=Decimal("700"), fixed_income_value=Decimal("200"), gold_value=Decimal("100"), crypto_value=Decimal("0"),
+        positions=positions, accounts=(), movements=(),
+    )
+
+    html = dashboard_v2_html(report)
+
+    assert "Efectivo" in html
+    assert "Renta variable · Largo plazo" in html
+    assert "Renta variable · Corto plazo" in html
+    assert "Renta fija" in html
+    assert "Oro" in html
+    assert "Bitcoin" in html
+    assert "16,67%" in html
+    assert "33,33%" in html
+    assert "25,00%" in html
+    assert "8,33%" in html
+    assert "100% del patrimonio" in html
+    assert "1.200,00 €" in html
