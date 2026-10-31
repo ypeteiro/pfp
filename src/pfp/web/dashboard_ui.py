@@ -61,6 +61,7 @@ def dashboard_v2_html(report: PortfolioReport, sort: str = "weight", direction: 
         f'<div class="bar"><span style="width:{float(tactical_weight * 100) if tactical_weight is not None else 0:.2f}%"></span></div><div class="allocation-meta">{euro(report.tactical_equity_value)} · {pct(tactical_total_weight)} del patrimonio total</div></div>'
     )
 
+    allocation_carousel = _allocation_carousel(report, bars, equity_strategy_html, targets)
     positions = sort_positions(report, sort, direction)
     position_rows = "".join(f'<tr><td>{escape(p.ticker or p.isin or p.symbol)}</td><td>{escape(p.name)}</td><td>{strategy_label(p.investment_strategy)}</td><td>{pct(p.weight)}</td><td>{euro(p.market_value)}</td><td class="{"positive" if p.gain_loss is not None and p.gain_loss > 0 else "negative" if p.gain_loss is not None and p.gain_loss < 0 else ""}">{euro(p.gain_loss)}</td></tr>' for p in positions[:15])
     total_pl = report.realized_gain_loss + report.unrealized_gain_loss
@@ -76,9 +77,74 @@ def dashboard_v2_html(report: PortfolioReport, sort: str = "weight", direction: 
   <div class="hero"><div><h1>Tu patrimonio</h1><p class="muted">Una lectura rápida de dónde está tu dinero y cómo se desvía de tu estrategia.</p>{price_status}</div></div>
   <section class="metric-grid">{metric("Patrimonio total", report.total_value)}{metric("Efectivo", report.cash)}{metric("Efectivo invertible", report.investable_cash)}{metric("Cartera invertida", report.market_value)}{metric("P/L realizado", report.realized_gain_loss)}{metric("P/L no realizado", report.unrealized_gain_loss)}{metric("P/L total", total_pl, "positive" if total_pl >= 0 else "negative")}{metric("Rendimiento acumulado", accumulated_return or Decimal("0"), return_tone, value_is_percent=True)}</section>
   {evolution_html}
-  <section class="two-col"><article class="panel"><div class="panel-heading allocation-panel-heading"><h2>Asignación {tooltip("Distribución actual de tu patrimonio por clase de activo.")}</h2><span>Objetivo {pct(targets["RV"])} / {pct(targets["RF"])} / {pct(targets["Oro"])} / {pct(targets["Cripto"])}</span></div>{''.join(bars)}<div class="allocation-subsection"><h3>Renta variable: largo vs corto plazo {tooltip("Permite controlar cuánto riesgo táctico estás asumiendo dentro de la renta variable.")}</h3>{equity_strategy_html}</div></article><article class="panel"><div class="panel-heading"><h2>Posiciones principales</h2><span>{len(report.positions)} activos</span></div><table><thead><tr>{sort_heading("Activo", "symbol", sort, direction)}{sort_heading("Nombre", "name", sort, direction)}<th>Estrategia</th>{sort_heading("Peso", "weight", sort, direction)}{sort_heading("Valor", "value", sort, direction)}<th>P/L</th></tr></thead><tbody>{position_rows or '<tr><td colspan="6">Sin posiciones</td></tr>'}</tbody></table></article></section>
+  <section class="two-col"><article class="panel">{allocation_carousel}</article><article class="panel"><div class="panel-heading"><h2>Posiciones principales</h2><span>{len(report.positions)} activos</span></div><table><thead><tr>{sort_heading("Activo", "symbol", sort, direction)}{sort_heading("Nombre", "name", sort, direction)}<th>Estrategia</th>{sort_heading("Peso", "weight", sort, direction)}{sort_heading("Valor", "value", sort, direction)}<th>P/L</th></tr></thead><tbody>{position_rows or '<tr><td colspan="6">Sin posiciones</td></tr>'}</tbody></table></article></section>
 </section>
 """
+
+
+def _allocation_carousel(report: PortfolioReport, bars: list[str], equity_strategy_html: str, targets: dict[str, Decimal]) -> str:
+    pie_data = [
+        ("Efectivo", report.cash, "#64748b", "Dinero disponible que todavía no está invertido."),
+        ("Renta variable · Largo plazo", report.long_term_equity_value, "#2563eb", "Renta variable destinada a mantener a largo plazo, como VWCE."),
+        ("Renta variable · Corto plazo", report.equity_value - report.long_term_equity_value, "#f59e0b", "Renta variable destinada a operaciones más arriesgadas y con un horizonte de venta más corto."),
+        ("Renta fija", report.fixed_income_value, "#059669", "Bonos, fondos y otros activos de renta fija."),
+        ("Oro", report.gold_value, "#ca8a04", "Exposición al oro como activo diversificador."),
+        ("Bitcoin", report.crypto_value, "#ea580c", "Exposición a bitcoin y otros criptoactivos."),
+    ]
+    pie_total = sum((value for _, value, _, _ in pie_data), Decimal("0"))
+    if pie_total == 0:
+        pie_gradient = "conic-gradient(#e5e7eb 0deg 360deg)"
+    else:
+        start = Decimal("0")
+        segments = []
+        for _, value, color, _ in pie_data:
+            degrees = value / pie_total * Decimal("360")
+            end = start + degrees
+            segments.append(f"{color} {float(start):.4f}deg {float(end):.4f}deg")
+            start = end
+        pie_gradient = "conic-gradient(" + ", ".join(segments) + ")"
+
+    legend = []
+    for label, value, color, tip in pie_data:
+        weight = value / pie_total if pie_total else None
+        legend.append(
+            f'<div class="allocation-pie-item"><span class="allocation-pie-dot" style="background:{color}"></span>'
+            f'<div><div class="allocation-pie-name">{escape(label)} {tooltip(tip)}</div>'
+            f'<strong>{pct(weight)}</strong><span class="allocation-pie-value"> · {euro(value)}</span></div></div>'
+        )
+
+    first_slide = (
+        '<div class="allocation-slide" data-chart-slide="0">'
+        '<div class="panel-heading allocation-panel-heading">'
+        f'<div><h2>Asignación {tooltip("Distribución actual de tu cartera por clase de activo frente a los objetivos configurados.")}</h2>'
+        f'<span>Objetivo {pct(targets["RV"])} / {pct(targets["RF"])} / {pct(targets["Oro"])} / {pct(targets["Cripto"])}</span></div>'
+        '<span class="allocation-chart-title">Asignación actual</span></div>'
+        + "".join(bars)
+        + '<div class="allocation-subsection"><h3>Renta variable: largo vs corto plazo '
+        + tooltip("Permite controlar cuánto riesgo táctico estás asumiendo dentro de la renta variable.")
+        + '</h3>' + equity_strategy_html + '</div></div>'
+    )
+    second_slide = (
+        '<div class="allocation-slide" data-chart-slide="1" hidden>'
+        '<div class="panel-heading allocation-panel-heading"><div>'
+        f'<h2>Distribución del dinero total {tooltip("Porcentaje de todo tu patrimonio actual, incluyendo el efectivo.")}</h2>'
+        '<span>100% del patrimonio</span></div><span class="allocation-chart-title">Composición actual</span></div>'
+        '<div class="allocation-pie-layout">'
+        f'<div class="allocation-pie" role="img" aria-label="Distribución del dinero total: {escape("; ".join(f"{label}: {pct(value / pie_total) if pie_total else "0,00%"}" for label, value, _, _ in pie_data))}" style="background:{pie_gradient}"><div class="allocation-pie-hole"><strong>{euro(pie_total)}</strong><span>patrimonio total</span></div></div>'
+        f'<div class="allocation-pie-legend">{"".join(legend)}</div>'
+        '</div></div>'
+    )
+    return (
+        '<div class="allocation-carousel" data-chart-carousel>'
+        '<div class="allocation-carousel-controls">'
+        '<button type="button" class="allocation-carousel-button" data-chart-prev aria-label="Gráfico anterior">‹</button>'
+        '<span class="allocation-carousel-position" data-chart-position>1 / 2</span>'
+        '<button type="button" class="allocation-carousel-button" data-chart-next aria-label="Gráfico siguiente">›</button>'
+        '</div>'
+        f'<div class="allocation-carousel-viewport">{first_slide}{second_slide}</div>'
+        '<script>(function(){const root=document.currentScript.closest("[data-chart-carousel]");if(!root)return;const slides=[...root.querySelectorAll("[data-chart-slide]")];const position=root.querySelector("[data-chart-position]");let index=0;function show(next){index=(next+slides.length)%slides.length;slides.forEach((slide,i)=>{slide.hidden=i!==index});position.textContent=(index+1)+" / "+slides.length;}root.querySelector("[data-chart-prev]").addEventListener("click",()=>show(index-1));root.querySelector("[data-chart-next]").addEventListener("click",()=>show(index+1));show(0);})();</script>'
+        '</div>'
+    )
 
 
 def sort_positions(report: PortfolioReport, sort: str, direction: str):
