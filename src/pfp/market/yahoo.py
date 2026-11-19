@@ -73,7 +73,8 @@ def lookup_yahoo_asset(query: str) -> dict[str, str] | None:
         # to an asset ticker.
         quote = exact or quotes[0]
         quote_symbol = str(quote.get("symbol", "")).strip()
-        if quote_symbol.lstrip("$").startswith("0P"):
+        normalized_symbol = quote_symbol.lstrip("$")
+        if normalized_symbol.startswith("0P"):
             return None
 
         name = str(
@@ -82,7 +83,7 @@ def lookup_yahoo_asset(query: str) -> dict[str, str] | None:
             or ""
         ).strip()
 
-        return {"ticker": quote_symbol, "name": name}
+        return {"ticker": normalized_symbol, "name": name}
     except Exception:
         return None
 
