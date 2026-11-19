@@ -7,6 +7,17 @@ from pfp.market.yahoo_historical import YahooFinanceHistoricalPriceProvider
 WHEN = datetime(2026, 1, 15, 10)
 
 
+def test_yahoo_historical_price_provider_uses_alphabet_nasdaq_symbol():
+    from pfp.domain.asset_catalog import AssetCatalog
+
+    asset = AssetCatalog.get("US02079K3059")
+    assert asset is not None
+    assert asset.ticker == "GOOGL"
+
+    provider = YahooFinanceHistoricalPriceProvider()
+    assert provider._historical_symbol("US02079K3059") == "GOOGL"
+
+
 def test_yahoo_historical_price_provider_returns_eur_close(monkeypatch):
     class Row:
         def __getitem__(self, key):
@@ -78,7 +89,6 @@ def test_yahoo_historical_price_provider_returns_none_for_unknown_symbol():
     provider = YahooFinanceHistoricalPriceProvider()
 
     assert provider.price("UNKNOWN", WHEN) is None
-
 
 
 def test_yahoo_historical_price_provider_skips_non_finite_close_and_uses_previous_valid_close(monkeypatch):
