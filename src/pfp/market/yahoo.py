@@ -24,6 +24,9 @@ YAHOO_SYMBOLS = {
     "US92840M1027": "VST",
     "US67066G1040": "NVDA",
     "US0605051046": "BAC",
+    # Use the liquid Nasdaq listing for Alphabet Class A. The Milan
+    # cross-listing (1GOOGL.MI) has stale Yahoo history.
+    "US02079K3059": "GOOGL",
 }
 
 
