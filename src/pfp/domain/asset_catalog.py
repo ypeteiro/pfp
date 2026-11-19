@@ -15,6 +15,7 @@ class AssetCatalog:
         "IE00B4ND3602": Asset(symbol="IE00B4ND3602", name="Gold", portfolio_class="GOLD", isin="IE00B4ND3602"),
         "US55024U1097": Asset(symbol="US55024U1097", name="Lumentum Holdings", portfolio_class="STOCK", isin="US55024U1097", ticker="LITE", investment_strategy=TACTICAL),
         "US1717793095": Asset(symbol="US1717793095", name="Ciena", portfolio_class="STOCK", isin="US1717793095", ticker="CIEN", investment_strategy=TACTICAL),
+        "US02079K3059": Asset(symbol="US02079K3059", name="Alphabet Inc. Class A", portfolio_class="STOCK", isin="US02079K3059", ticker="GOOGL", investment_strategy=TACTICAL),
     }
 
     @classmethod
